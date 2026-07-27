@@ -1,0 +1,340 @@
+from django.shortcuts import render
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action, permission_classes
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.contrib.auth import authenticate
+from django.utils import timezone
+from datetime import timedelta
+from django.db import transaction
+import re
+from .models import User, Session, Booking
+from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer
+
+
+class SignupView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+        name = request.data.get('name', '')
+
+        if not email or not password:
+            return Response(
+                {'success': False, 'error': 'Email and password required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate email format
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return Response(
+                {'success': False, 'error': 'Invalid email format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate password strength (minimum 8 characters)
+        if len(password) < 8:
+            return Response(
+                {'success': False, 'error': 'Password must be at least 8 characters'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {'success': False, 'error': 'User already exists'},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        user = User.objects.create_user(
+            email=email,
+            username=email,
+            password=password,
+            first_name=name
+        )
+
+        serializer = UserSerializer(user)
+        return Response({
+            'success': True,
+            'user': serializer.data,
+            'token': f'simple_token_{user.id}'  # Simple token for demo
+        })
+
+
+class LoginView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not email or not password:
+            return Response(
+                {'success': False, 'error': 'Email and password required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate email format
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return Response(
+                {'success': False, 'error': 'Invalid email format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = authenticate(username=email, password=password)
+        
+        if not user:
+            return Response(
+                {'success': False, 'error': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        serializer = UserSerializer(user)
+        return Response({
+            'success': True,
+            'user': serializer.data,
+            'token': f'simple_token_{user.id}'  # Simple token for demo
+        })
+
+
+class GoogleLoginView(APIView):
+    def post(self, request):
+        """
+        Handle Google OAuth login callback
+        Note: This is a simplified implementation. In production, use proper OAuth flow
+        with django-allauth and verify the Google token with Google's API.
+        """
+        google_token = request.data.get('token')
+        email = request.data.get('email')
+        name = request.data.get('name')
+        
+        if not email:
+            return Response(
+                {'success': False, 'error': 'Email required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not google_token:
+            return Response(
+                {'success': False, 'error': 'Google token required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate email format
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return Response(
+                {'success': False, 'error': 'Invalid email format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # TODO: In production, verify the Google token with Google's API
+        # For now, we'll proceed with a simplified approach
+        # This should be replaced with proper token verification using:
+        # from google.oauth2 import id_token
+        # from google.auth.transport import requests as google_requests
+        # id_info = id_token.verify_oauth2_token(google_token, google_requests.Request(), GOOGLE_CLIENT_ID)
+
+        # Check if user exists, create if not
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': email,
+                'first_name': name,
+            }
+        )
+
+        serializer = UserSerializer(user)
+        return Response({
+            'success': True,
+            'user': serializer.data,
+            'token': f'simple_token_{user.id}',
+            'is_new_user': created
+        })
+
+
+class SessionViewSet(viewsets.ModelViewSet):
+    queryset = Session.objects.all()
+    serializer_class = SessionSerializer
+
+    def get_queryset(self):
+        queryset = Session.objects.all()
+        session_type = self.request.query_params.get('type')
+        upcoming = self.request.query_params.get('upcoming')
+        status_filter = self.request.query_params.get('status')
+        search = self.request.query_params.get('search')
+
+        if session_type:
+            queryset = queryset.filter(type=session_type)
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        if upcoming == 'true':
+            queryset = queryset.filter(
+                scheduled_for__gt=timezone.now(),
+                status='scheduled'
+            ).order_by('scheduled_for')
+
+        if search:
+            queryset = queryset.filter(
+                title__icontains=search
+            ) | queryset.filter(
+                description__icontains=search
+            ) | queryset.filter(
+                facilitator__icontains=search
+            )
+
+        return queryset.order_by('-scheduled_for')
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({'success': True, 'session': serializer.data}, status=status.HTTP_201_CREATED)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'success': True, 'sessions': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    @transaction.atomic
+    def book(self, request, pk=None):
+        session = self.get_object()
+        user_id = request.data.get('user_id')
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'success': False, 'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Lock the session row to prevent race conditions
+        session = Session.objects.select_for_update().get(pk=session.pk)
+
+        if session.current_participants >= session.max_participants:
+            return Response(
+                {'success': False, 'error': 'Session is full'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if Booking.objects.filter(session=session, user=user).exists():
+            return Response(
+                {'success': False, 'error': 'Already booked'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        booking = Booking.objects.create(session=session, user=user)
+        session.current_participants += 1
+        session.save()
+        
+        user.sessions_joined += 1
+        user.save()
+
+        serializer = BookingSerializer(booking)
+        return Response({'success': True, 'booking': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    def cancel_booking(self, request, pk=None):
+        session = self.get_object()
+        user_id = request.data.get('user_id')
+
+        try:
+            user = User.objects.get(id=user_id)
+            booking = Booking.objects.get(session=session, user=user, status='confirmed')
+        except (User.DoesNotExist, Booking.DoesNotExist):
+            return Response(
+                {'success': False, 'error': 'Booking not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        booking.status = 'cancelled'
+        booking.save()
+
+        session.current_participants = max(0, session.current_participants - 1)
+        session.save()
+
+        return Response({'success': True, 'message': 'Booking cancelled'})
+
+    @action(detail=True, methods=['post'])
+    def start_session(self, request, pk=None):
+        """Admin action to start a session"""
+        session = self.get_object()
+        session.status = 'live'
+        session.save()
+        serializer = self.get_serializer(session)
+        return Response({'success': True, 'session': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    def end_session(self, request, pk=None):
+        """Admin action to end a session"""
+        session = self.get_object()
+        session.status = 'completed'
+        session.save()
+
+        # Update focus hours for all participants
+        bookings = Booking.objects.filter(session=session, status='confirmed')
+        focus_hours = session.duration / 60
+        for booking in bookings:
+            booking.status = 'completed'
+            booking.user.focus_hours += focus_hours
+            booking.user.save()
+            booking.save()
+
+        serializer = self.get_serializer(session)
+        return Response({'success': True, 'session': serializer.data})
+
+    @action(detail=True, methods=['get'])
+    @permission_classes([permissions.IsAdminUser])
+    def participants(self, request, pk=None):
+        """Get all participants for a session (admin only)"""
+        session = self.get_object()
+        bookings = Booking.objects.filter(session=session, status='confirmed')
+        participants = []
+        for booking in bookings:
+            participants.append({
+                'id': booking.user.id,
+                'email': booking.user.email,
+                'firstName': booking.user.first_name,
+                'lastName': booking.user.last_name,
+                'bookedAt': booking.booked_at.isoformat()
+            })
+
+        return Response({
+            'success': True,
+            'participants': participants,
+            'count': len(participants)
+        })
+
+    @action(detail=False, methods=['get'])
+    @permission_classes([permissions.IsAdminUser])
+    def stats(self, request):
+        """Get session statistics (admin only)"""
+        total_sessions = Session.objects.count()
+        scheduled_sessions = Session.objects.filter(status='scheduled').count()
+        live_sessions = Session.objects.filter(status='live').count()
+        completed_sessions = Session.objects.filter(status='completed').count()
+        total_bookings = Booking.objects.filter(status='confirmed').count()
+
+        return Response({
+            'success': True,
+            'stats': {
+                'totalSessions': total_sessions,
+                'scheduledSessions': scheduled_sessions,
+                'liveSessions': live_sessions,
+                'completedSessions': completed_sessions,
+                'totalBookings': total_bookings
+            }
+        })
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+    @action(detail=True, methods=['get'])
+    def sessions(self, request, pk=None):
+        user = self.get_object()
+        bookings = Booking.objects.filter(user=user, status='confirmed')
+        sessions = [booking.session for booking in bookings]
+        serializer = SessionSerializer(sessions, many=True)
+        return Response({'success': True, 'sessions': serializer.data})
+

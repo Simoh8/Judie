@@ -1,0 +1,252 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSessionStore } from "@/stores/sessionStore";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight } from "lucide-react";
+
+export default function AdminDashboardPage() {
+  const { user } = useAuth();
+  const { getStats } = useSessionStore();
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Temporary admin check - allow admin@flown.com regardless of isStaff field
+  const isAdmin = user?.isStaff || user?.email === 'admin@flown.com';
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const statsData = await getStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error("Failed to load stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isAdmin) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+            <p className="text-foreground/60">This page is for administrators only.</p>
+            <button
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/';
+              }}
+              className="mt-4 btn-ios btn-primary"
+            >
+              Logout and Login Again
+            </button>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50 dark:bg-ios-gray-900">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-6 py-8 pt-24">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+            <p className="text-foreground/60 mt-2">Overview of platform activity and session management</p>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-12 text-foreground/60">Loading dashboard...</div>
+          ) : (
+            <>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-xl">
+                      <Calendar className="text-blue-600 dark:text-blue-300" size={24} />
+                    </div>
+                    <span className="text-xs font-medium text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded-full">
+                      Active
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-foreground mb-1">{stats?.totalSessions || 0}</div>
+                  <div className="text-sm text-foreground/60">Total Sessions</div>
+                </div>
+
+                <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-green-100 dark:bg-green-900 rounded-xl">
+                      <Clock className="text-green-600 dark:text-green-300" size={24} />
+                    </div>
+                    <span className="text-xs font-medium text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full">
+                      Scheduled
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-foreground mb-1">{stats?.scheduledSessions || 0}</div>
+                  <div className="text-sm text-foreground/60">Scheduled Sessions</div>
+                </div>
+
+                <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-xl">
+                      <Activity className="text-purple-600 dark:text-purple-300" size={24} />
+                    </div>
+                    <span className="text-xs font-medium text-orange-600 bg-orange-100 dark:bg-orange-900 dark:text-orange-300 px-2 py-1 rounded-full">
+                      Live
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-foreground mb-1">{stats?.liveSessions || 0}</div>
+                  <div className="text-sm text-foreground/60">Live Sessions</div>
+                </div>
+
+                <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded-xl">
+                      <Users className="text-orange-600 dark:text-orange-300" size={24} />
+                    </div>
+                    <span className="text-xs font-medium text-purple-600 bg-purple-100 dark:bg-purple-900 dark:text-purple-300 px-2 py-1 rounded-full">
+                      Bookings
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-foreground mb-1">{stats?.totalBookings || 0}</div>
+                  <div className="text-sm text-foreground/60">Total Bookings</div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm mb-8">
+                <h2 className="text-xl font-semibold text-foreground mb-4">Quick Actions</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <a
+                    href="/admin/sessions"
+                    className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                        <Calendar className="text-blue-600 dark:text-blue-300" size={20} />
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">Manage Sessions</div>
+                        <div className="text-sm text-foreground/60">Create, edit, and manage sessions</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="text-foreground/40" size={20} />
+                  </a>
+
+                  <a
+                    href="/admin/users"
+                    className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                        <Users className="text-green-600 dark:text-green-300" size={20} />
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">Manage Users</div>
+                        <div className="text-sm text-foreground/60">View and manage user accounts</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="text-foreground/40" size={20} />
+                  </a>
+                </div>
+              </div>
+
+              {/* Activity Overview */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">Session Status</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-foreground/60">Scheduled</span>
+                        <span className="font-medium text-foreground">{stats?.scheduledSessions || 0}</span>
+                      </div>
+                      <div className="w-full bg-ios-gray-200 dark:bg-ios-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{ width: `${stats?.totalSessions ? (stats.scheduledSessions / stats.totalSessions) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-foreground/60">Live</span>
+                        <span className="font-medium text-foreground">{stats?.liveSessions || 0}</span>
+                      </div>
+                      <div className="w-full bg-ios-gray-200 dark:bg-ios-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-green-600 h-2 rounded-full"
+                          style={{ width: `${stats?.totalSessions ? (stats.liveSessions / stats.totalSessions) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-foreground/60">Completed</span>
+                        <span className="font-medium text-foreground">{stats?.completedSessions || 0}</span>
+                      </div>
+                      <div className="w-full bg-ios-gray-200 dark:bg-ios-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-gray-600 h-2 rounded-full"
+                          style={{ width: `${stats?.totalSessions ? (stats.completedSessions / stats.totalSessions) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">Platform Health</h2>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <TrendingUp className="text-green-600" size={20} />
+                        <div>
+                          <div className="font-medium text-foreground">Session Engagement</div>
+                          <div className="text-sm text-foreground/60">Active participation rate</div>
+                        </div>
+                      </div>
+                      <span className="text-green-600 font-semibold">High</span>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <Users className="text-blue-600" size={20} />
+                        <div>
+                          <div className="font-medium text-foreground">User Growth</div>
+                          <div className="text-sm text-foreground/60">New registrations</div>
+                        </div>
+                      </div>
+                      <span className="text-blue-600 font-semibold">Steady</span>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <Clock className="text-purple-600" size={20} />
+                        <div>
+                          <div className="font-medium text-foreground">Focus Hours</div>
+                          <div className="text-sm text-foreground/60">Total productive time</div>
+                        </div>
+                      </div>
+                      <span className="text-purple-600 font-semibold">Growing</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <Footer />
+      </div>
+    </ProtectedRoute>
+  );
+}
