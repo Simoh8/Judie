@@ -109,7 +109,7 @@ export default function MySessions() {
               </div>
             ) : (
               <div className="card-ios p-12 text-center animate-slide-up">
-                <p className="text-foreground/60 mb-4">You haven't joined any sessions yet</p>
+                <p className="text-foreground/60 mb-4">You have not joined any sessions yet</p>
                 <button className="btn-ios btn-primary">Browse Sessions</button>
               </div>
             )}
