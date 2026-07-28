@@ -19,15 +19,18 @@ export default function AuthCallback() {
         // Store the token and user info
         localStorage.setItem("token", token);
         localStorage.setItem("user", JSON.stringify({
-          id: parseInt(userId),
+          id: userId,
           email: email,
         }));
 
         // Update the user store
         useUserStore.setState({
           user: {
-            id: parseInt(userId),
+            id: userId,
             email: email,
+            createdAt: new Date(),
+            focusHours: 0,
+            sessionsJoined: 0,
           },
           token: token,
           loading: false,
