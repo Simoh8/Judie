@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import SignupView, LoginView, GoogleLoginView, SessionViewSet, UserViewSet
+from .views import SignupView, LoginView, GoogleLoginView, GoogleOAuthCallbackView, SessionViewSet, UserViewSet
 
 router = DefaultRouter()
 router.register(r'sessions', SessionViewSet, basename='session')
@@ -10,5 +10,6 @@ urlpatterns = [
     path('auth/signup/', SignupView.as_view(), name='signup'),
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
+    path('auth/google/callback/', GoogleOAuthCallbackView.as_view(), name='google_oauth_callback'),
     path('', include(router.urls)),
 ]

@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, permission_classes
 from rest_framework.response import Response
@@ -7,6 +7,8 @@ from django.contrib.auth import authenticate
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
+from django.conf import settings
+import os
 import re
 from .models import User, Session, Booking
 from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer
@@ -103,7 +105,7 @@ class GoogleLoginView(APIView):
         google_token = request.data.get('token')
         email = request.data.get('email')
         name = request.data.get('name')
-        
+
         if not email:
             return Response(
                 {'success': False, 'error': 'Email required'},
@@ -146,6 +148,35 @@ class GoogleLoginView(APIView):
             'token': f'simple_token_{user.id}',
             'is_new_user': created
         })
+
+
+class GoogleOAuthCallbackView(APIView):
+    def get(self, request):
+        """
+        Handle OAuth callback from Google after successful authentication.
+        This view receives the callback from django-allauth and redirects to the frontend
+        with the user token.
+        """
+        from django.contrib.auth import login
+        from allauth.socialaccount.models import SocialAccount
+
+        # Get the authenticated user from the session (set by allauth)
+        if not request.user.is_authenticated:
+            return Response(
+                {'success': False, 'error': 'Authentication failed'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        user = request.user
+        serializer = UserSerializer(user)
+        token = f'simple_token_{user.id}'
+
+        # Get frontend URL from environment or default
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+        # Redirect to frontend with token and user info as URL parameters
+        redirect_url = f"{frontend_url}/auth/callback?token={token}&user_id={user.id}&email={user.email}"
+        return redirect(redirect_url)
 
 
 class SessionViewSet(viewsets.ModelViewSet):

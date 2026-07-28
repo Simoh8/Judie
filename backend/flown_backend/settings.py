@@ -184,6 +184,9 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
 
+# Redirect to our custom callback after OAuth login
+SOCIALACCOUNT_LOGIN_REDIRECT_URL = '/api/auth/google/callback/'
+
 # Google OAuth settings (you'll need to get these from Google Cloud Console)
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
@@ -201,3 +204,6 @@ SOCIALACCOUNT_PROVIDERS = {
         }
     }
 }
+
+# Frontend URL for OAuth callbacks
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')

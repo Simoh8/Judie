@@ -137,8 +137,8 @@ export default function AuthModal({ isOpen, onClose, defaultMode = "login" }: Au
 
         <button
           onClick={() => {
-            // For now, just show an alert - in production, integrate with Google OAuth
-            alert("Google OAuth integration requires Google Cloud Console setup. The backend is configured with your credentials.");
+            // Redirect to Google OAuth login
+            window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/accounts/google/login/`;
           }}
           className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-ios-gray-200 dark:border-ios-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-ios-gray-800 transition-colors"
         >
