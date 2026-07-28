@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSessionStore } from "@/stores/sessionStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -17,11 +17,7 @@ export default function AdminDashboardPage() {
   // Temporary admin check - allow admin@flown.com regardless of isStaff field
   const isAdmin = user?.isStaff || user?.email === 'admin@flown.com';
 
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const statsData = await getStats();
       setStats(statsData);
@@ -30,7 +26,11 @@ export default function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getStats]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   if (!isAdmin) {
     return (

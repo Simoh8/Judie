@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSessionStore } from "@/stores/sessionStore";
 import { Session } from "@/lib/types";
@@ -39,16 +39,16 @@ export default function AdminSessionsPage() {
 
   const isAdmin = user?.isStaff;
 
+  const loadStats = useCallback(async () => {
+    const statsData = await getStats();
+    setStats(statsData);
+  }, [getStats]);
+
   useEffect(() => {
     loadStats();
     // Initial load of sessions
     useSessionStore.getState().loadSessions();
-  }, []);
-
-  const loadStats = async () => {
-    const statsData = await getStats();
-    setStats(statsData);
-  };
+  }, [loadStats]);
 
   const handleCreateSession = async (sessionData: any) => {
     try {
