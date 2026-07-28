@@ -1,6 +1,7 @@
-import type { Config } from "tailwindcss";
 
-const config: Config = {
+import plugin from "tailwindcss/plugin";
+
+const config = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -67,44 +68,22 @@ const config: Config = {
       },
     },
   },
+
   plugins: [
-    function({ addComponents, addUtilities }) {
+    plugin(function ({ addComponents, addUtilities }) {
       addComponents({
-        '.btn-ios': {
-          '@apply px-6 py-3 rounded-full font-medium transition-all duration-300 transform hover:scale-105 active:scale-95': {},
-        },
-        '.btn-primary': {
-          '@apply bg-ios-blue text-white hover:bg-blue-600': {},
-        },
-        '.btn-secondary': {
-          '@apply bg-ios-gray-100 text-ios-gray-900 hover:bg-ios-gray-200': {},
-        },
-        '.card-ios': {
-          '@apply bg-white rounded-3xl p-6 ios-shadow transition-all duration-300 hover:shadow-lg': {},
-        },
-        '.card-ios-dark': {
-          '@apply bg-ios-gray-900 rounded-3xl p-6 ios-shadow transition-all duration-300 hover:shadow-lg': {},
+        ".btn-ios": {
+          "@apply px-6 py-3 rounded-full font-medium transition-all duration-300 transform hover:scale-105 active:scale-95": {},
         },
       });
+
       addUtilities({
-        '.glass': {
-          background: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(20px)',
-          '-webkit-backdrop-filter': 'blur(20px)',
-        },
-        '.glass-dark': {
-          background: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(20px)',
-          '-webkit-backdrop-filter': 'blur(20px)',
-        },
-        '.ios-shadow': {
-          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)',
-        },
-        '.ios-shadow-lg': {
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+        ".glass": {
+          background: "rgba(255,255,255,0.8)",
+          backdropFilter: "blur(20px)",
         },
       });
-    },
+    }),
   ],
 };
 export default config;
