@@ -28,10 +28,12 @@ export const api = {
   },
 
   async googleLogin(email: string, name: string, token: string): Promise<AuthResponse> {
+    // The backend verifies the Google ID token and extracts email/name from it.
+    // The `email` and `name` params are fallbacks only (backend ignores them if token is valid).
     const response = await fetch(`${API_BASE}/auth/google/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name, token }),
+      body: JSON.stringify({ token }),
     });
     return response.json();
   },

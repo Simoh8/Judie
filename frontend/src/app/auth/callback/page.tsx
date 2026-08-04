@@ -6,7 +6,6 @@ import { useUserStore } from "@/stores/userStore";
 
 export default function AuthCallback() {
   const router = useRouter();
-  const { login } = useUserStore();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -14,32 +13,30 @@ export default function AuthCallback() {
       const token = urlParams.get("token");
       const userId = urlParams.get("user_id");
       const email = urlParams.get("email");
+      const name = urlParams.get("name") ?? "";
 
       if (token && userId && email) {
-        // Store the token and user info
-        localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify({
+        const user = {
           id: userId,
           email: email,
-        }));
+          first_name: name.split(" ")[0] ?? "",
+          last_name: name.split(" ").slice(1).join(" ") ?? "",
+          createdAt: new Date(),
+          focusHours: 0,
+          sessionsJoined: 0,
+        };
 
-        // Update the user store
-        useUserStore.setState({
-          user: {
-            id: userId,
-            email: email,
-            createdAt: new Date(),
-            focusHours: 0,
-            sessionsJoined: 0,
-          },
-          token: token,
-          loading: false,
-        });
+        // Persist to localStorage
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", JSON.stringify(user));
+
+        // Update the Zustand store
+        useUserStore.setState({ user, token, loading: false });
 
         // Redirect to dashboard
         router.push("/dashboard");
       } else {
-        // If no token, redirect to login with error
+        // OAuth failed — redirect to home with error flag
         router.push("/?error=oauth_failed");
       }
     };
@@ -56,3 +53,4 @@ export default function AuthCallback() {
     </div>
   );
 }
+

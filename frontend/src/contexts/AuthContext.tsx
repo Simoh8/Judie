@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     userStore.loadUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userStore]);
+  }, []);
 
   return (
     <AuthContext.Provider value={{

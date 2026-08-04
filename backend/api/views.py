@@ -5,13 +5,54 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.db import transaction
 from django.conf import settings
 import os
 import re
+import jwt
+import requests as http_requests
 from .models import User, Session, Booking
 from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer
+
+
+GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+
+
+def generate_auth_token(user: "User") -> str:
+    """Generate a signed JWT token for the given user."""
+    payload = {
+        "user_id": user.id,
+        "email": user.email,
+        "exp": datetime.utcnow() + timedelta(days=7),
+        "iat": datetime.utcnow(),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+
+def verify_google_id_token(id_token: str) -> dict | None:
+    """
+    Verify a Google ID token by calling Google's tokeninfo endpoint.
+    Returns the token payload dict on success, or None on failure.
+    """
+    try:
+        resp = http_requests.get(
+            GOOGLE_TOKEN_INFO_URL,
+            params={"id_token": id_token},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return None
+        token_data = resp.json()
+
+        # Verify the audience matches our configured client ID
+        client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+        if client_id and token_data.get("aud") != client_id:
+            return None
+
+        return token_data
+    except Exception:
+        return None
 
 
 class SignupView(APIView):
@@ -98,54 +139,65 @@ class LoginView(APIView):
 class GoogleLoginView(APIView):
     def post(self, request):
         """
-        Handle Google OAuth login callback
-        Note: This is a simplified implementation. In production, use proper OAuth flow
-        with django-allauth and verify the Google token with Google's API.
+        Handle Google Sign-In ID token verification and login.
+        The frontend sends the raw Google ID token credential; we verify it
+        with Google's tokeninfo endpoint, then create/retrieve the user.
         """
         google_token = request.data.get('token')
-        email = request.data.get('email')
-        name = request.data.get('name')
-
-        if not email:
-            return Response(
-                {'success': False, 'error': 'Email required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Accept explicit email/name overrides only as fallbacks
+        provided_email = request.data.get('email', '')
+        provided_name = request.data.get('name', '')
 
         if not google_token:
             return Response(
-                {'success': False, 'error': 'Google token required'},
+                {'success': False, 'error': 'Google ID token required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validate email format
-        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+        # Verify the token with Google
+        token_data = verify_google_id_token(google_token)
+        if not token_data:
             return Response(
-                {'success': False, 'error': 'Invalid email format'},
+                {'success': False, 'error': 'Invalid or expired Google token'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Extract verified identity from Google's response
+        email = token_data.get('email') or provided_email
+        name = token_data.get('name') or provided_name
+        first_name = token_data.get('given_name', '')
+        last_name = token_data.get('family_name', '')
+
+        if not email:
+            return Response(
+                {'success': False, 'error': 'Could not retrieve email from Google token'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # TODO: In production, verify the Google token with Google's API
-        # For now, we'll proceed with a simplified approach
-        # This should be replaced with proper token verification using:
-        # from google.oauth2 import id_token
-        # from google.auth.transport import requests as google_requests
-        # id_info = id_token.verify_oauth2_token(google_token, google_requests.Request(), GOOGLE_CLIENT_ID)
+        # Only accept verified email addresses from Google
+        if not token_data.get('email_verified', False):
+            return Response(
+                {'success': False, 'error': 'Google email address is not verified'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
-        # Check if user exists, create if not
+        # Create or retrieve the user
         user, created = User.objects.get_or_create(
             email=email,
             defaults={
                 'username': email,
-                'first_name': name,
+                'first_name': first_name or name.split(' ')[0] if name else '',
+                'last_name': last_name,
             }
         )
 
+        # Issue a signed JWT
+        token = generate_auth_token(user)
         serializer = UserSerializer(user)
         return Response({
             'success': True,
             'user': serializer.data,
-            'token': f'simple_token_{user.id}',
+            'token': token,
             'is_new_user': created
         })
 
@@ -153,29 +205,28 @@ class GoogleLoginView(APIView):
 class GoogleOAuthCallbackView(APIView):
     def get(self, request):
         """
-        Handle OAuth callback from Google after successful authentication.
-        This view receives the callback from django-allauth and redirects to the frontend
-        with the user token.
+        Handle OAuth callback from Google after successful authentication via django-allauth.
+        Generates a signed JWT and redirects to the frontend callback page.
         """
-        from django.contrib.auth import login
-        from allauth.socialaccount.models import SocialAccount
-
         # Get the authenticated user from the session (set by allauth)
         if not request.user.is_authenticated:
-            return Response(
-                {'success': False, 'error': 'Authentication failed'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            frontend_url = settings.FRONTEND_URL
+            return redirect(f"{frontend_url}/?error=oauth_failed")
 
         user = request.user
+
+        # Issue a signed JWT so the frontend doesn't need to trust plain IDs
+        token = generate_auth_token(user)
         serializer = UserSerializer(user)
-        token = f'simple_token_{user.id}'
 
-        # Get frontend URL from environment or default
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
-
-        # Redirect to frontend with token and user info as URL parameters
-        redirect_url = f"{frontend_url}/auth/callback?token={token}&user_id={user.id}&email={user.email}"
+        frontend_url = settings.FRONTEND_URL
+        redirect_url = (
+            f"{frontend_url}/auth/callback"
+            f"?token={token}"
+            f"&user_id={user.id}"
+            f"&email={user.email}"
+            f"&name={user.get_full_name()}"
+        )
         return redirect(redirect_url)
 
 

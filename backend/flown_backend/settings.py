@@ -183,11 +183,20 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
+ACCOUNT_UNIQUE_EMAIL = True
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_ADAPTER = 'api.adapters.CustomSocialAccountAdapter'
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
-# Redirect to our custom callback after OAuth login
-SOCIALACCOUNT_LOGIN_REDIRECT_URL = '/api/auth/google/callback/'
+# After Google OAuth login, redirect to our callback view which then redirects to the frontend
+# Note: allauth uses LOGIN_REDIRECT_URL, not SOCIALACCOUNT_LOGIN_REDIRECT_URL
+LOGIN_REDIRECT_URL = '/api/auth/google/callback/'
 
-# Google OAuth settings (you'll need to get these from Google Cloud Console)
+# Use 'https' in production (set via env var ACCOUNT_DEFAULT_HTTP_PROTOCOL=https)
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = os.getenv('ACCOUNT_DEFAULT_HTTP_PROTOCOL', 'https')
+
+# Google OAuth settings
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': [
@@ -197,6 +206,8 @@ SOCIALACCOUNT_PROVIDERS = {
         'AUTH_PARAMS': {
             'access_type': 'online',
         },
+        # Email is already verified by Google — no secondary gate needed
+        'EMAIL_VERIFICATION': 'none',
         'APP': {
             'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID', ''),
             'secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', ''),

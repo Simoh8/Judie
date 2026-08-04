@@ -21,10 +21,11 @@ interface UserStore {
 export const useUserStore = create<UserStore>((set, get) => ({
   user: null,
   token: null,
-  loading: false,
+  loading: true,
   error: null,
 
   loadUser: () => {
+    if (typeof window === 'undefined') return;
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     
@@ -32,14 +33,17 @@ export const useUserStore = create<UserStore>((set, get) => ({
       try {
         set({ 
           token: storedToken, 
-          user: JSON.parse(storedUser) 
+          user: JSON.parse(storedUser),
+          loading: false
         });
+        return;
       } catch (error) {
         console.error('Failed to parse stored user:', error);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
     }
+    set({ loading: false });
   },
 
   login: async (email: string, password: string) => {

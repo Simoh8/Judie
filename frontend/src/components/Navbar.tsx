@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Menu, X, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthModal from "./AuthModal";
@@ -49,41 +50,41 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
-            <a
+            <Link
               href="/"
               className="text-2xl font-bold tracking-tight text-ios-blue"
             >
               FLOWN
-            </a>
+            </Link>
 
             <div className="hidden md:flex items-center space-x-8">
               {user ? (
                 <div className="flex items-center gap-4">
                   {user.isStaff ? (
                     <>
-                      <a
+                      <Link
                         href="/admin/sessions"
                         className="text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors"
                       >
                         Admin Sessions
-                      </a>
-                      <a
+                      </Link>
+                      <Link
                         href="/admin/dashboard"
                         className="text-sm font-medium text-foreground/80 hover:text-ios-blue transition-colors"
                       >
                         Dashboard
-                      </a>
+                      </Link>
                     </>
                   ) : (
                     <>
                       {userNavItems.map((item) => (
-                        <a
+                        <Link
                           key={item.name}
                           href={item.href}
                           className="text-sm font-medium text-foreground/80 hover:text-ios-blue transition-colors"
                         >
                           {item.name}
-                        </a>
+                        </Link>
                       ))}
                     </>
                   )}
@@ -101,13 +102,13 @@ export default function Navbar() {
               ) : (
                 <>
                   {isLandingPage && navItems.map((item) => (
-                    <a
+                    <Link
                       key={item.name}
                       href={item.href}
                       className="text-sm font-medium text-foreground/80 hover:text-ios-blue transition-colors duration-300"
                     >
                       {item.name}
-                    </a>
+                    </Link>
                   ))}
                   <button
                     onClick={() => setIsAuthModalOpen(true)}
@@ -134,32 +135,32 @@ export default function Navbar() {
                   <>
                     {user.isStaff ? (
                       <>
-                        <a
+                        <Link
                           href="/admin/sessions"
                           className="text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors duration-300"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
                           Admin Sessions
-                        </a>
-                        <a
+                        </Link>
+                        <Link
                           href="/admin/dashboard"
                           className="text-sm font-medium text-foreground/80 hover:text-ios-blue transition-colors duration-300"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
                           Dashboard
-                        </a>
+                        </Link>
                       </>
                     ) : (
                       <>
                         {userNavItems.map((item) => (
-                          <a
+                          <Link
                             key={item.name}
                             href={item.href}
                             className="text-sm font-medium text-foreground/80 hover:text-ios-blue transition-colors duration-300"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
                             {item.name}
-                          </a>
+                          </Link>
                         ))}
                       </>
                     )}
@@ -180,14 +181,14 @@ export default function Navbar() {
                 ) : (
                   <>
                     {isLandingPage && navItems.map((item) => (
-                      <a
+                      <Link
                         key={item.name}
                         href={item.href}
                         className="text-sm font-medium text-foreground/80 hover:text-ios-blue transition-colors duration-300"
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
                         {item.name}
-                      </a>
+                      </Link>
                     ))}
                     <button
                       onClick={() => {
