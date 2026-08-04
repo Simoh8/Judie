@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Session, Booking
+from .models import User, Session, Booking, Review
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -21,12 +21,19 @@ class SessionSerializer(serializers.ModelSerializer):
     maxParticipants = serializers.IntegerField(source='max_participants')
     currentParticipants = serializers.IntegerField(source='current_participants', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    averageRating = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'type', 'duration', 'scheduledFor', 'facilitator',
-                  'maxParticipants', 'currentParticipants', 'status', 'description', 'createdAt']
-        read_only_fields = ['id', 'currentParticipants', 'createdAt']
+                  'maxParticipants', 'currentParticipants', 'status', 'description', 'createdAt', 'averageRating']
+        read_only_fields = ['id', 'currentParticipants', 'createdAt', 'averageRating']
+
+    def get_averageRating(self, obj):
+        reviews = obj.reviews.all()
+        if not reviews:
+            return None
+        return sum(review.rating for review in reviews) / len(reviews)
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -44,3 +51,20 @@ class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = ['session', 'user']
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    session = SessionSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ['id', 'session', 'user', 'rating', 'comment', 'createdAt']
+        read_only_fields = ['id', 'createdAt']
+
+
+class ReviewCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ['session', 'user', 'rating', 'comment']

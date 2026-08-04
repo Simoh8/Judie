@@ -2,22 +2,37 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserStore } from "@/stores/userStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import { User, Mail, Calendar, Clock, Users, Save } from "lucide-react";
 
 export default function Profile() {
   const { user } = useAuth();
+  const { updateUser } = useUserStore();
   const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
     email: user?.email || "",
   });
 
-  const handleSave = () => {
-    // TODO: Call API to update user profile
-    setEditing(false);
+  const handleSave = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    try {
+      await updateUser({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+      });
+      setEditing(false);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -76,10 +91,11 @@ export default function Profile() {
                         </button>
                         <button
                           onClick={handleSave}
-                          className="btn-ios btn-primary text-sm flex items-center gap-2"
+                          disabled={loading}
+                          className="btn-ios btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
                         >
                           <Save size={16} />
-                          Save
+                          {loading ? "Saving..." : "Save"}
                         </button>
                       </div>
                     )}

@@ -3,12 +3,13 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     SignupView, LoginView,
     GoogleLoginView, GoogleOAuthCallbackView,
-    SessionViewSet, UserViewSet,
+    SessionViewSet, UserViewSet, ReviewViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'users', UserViewSet, basename='user')
+router.register(r'reviews', ReviewViewSet, basename='review')
 
 urlpatterns = [
     path('auth/signup/', SignupView.as_view(), name='signup'),

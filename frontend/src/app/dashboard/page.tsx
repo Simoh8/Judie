@@ -6,7 +6,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { Session } from "@/lib/types";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
-import { Calendar, Clock, Users, TrendingUp } from "lucide-react";
+import { Calendar, Clock, Users, TrendingUp, Star } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -116,6 +116,12 @@ export default function Dashboard() {
                           <Users size={16} />
                           <span>{session.currentParticipants}/{session.maxParticipants} joined</span>
                         </div>
+                        {session.averageRating && (
+                          <div className="flex items-center gap-2">
+                            <Star size={16} className="fill-yellow-400 text-yellow-400" />
+                            <span>{session.averageRating.toFixed(1)} / 5</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -88,3 +88,26 @@ class Booking(models.Model):
     class Meta:
         unique_together = ['session', 'user']
 
+
+class Review(models.Model):
+    RATING_CHOICES = [
+        (1, '1 star'),
+        (2, '2 stars'),
+        (3, '3 stars'),
+        (4, '4 stars'),
+        (5, '5 stars'),
+    ]
+
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='reviews')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
+    rating = models.IntegerField(choices=RATING_CHOICES)
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.session.title} ({self.rating} stars)"
+
+    class Meta:
+        unique_together = ['session', 'user']
+        ordering = ['-created_at']
+

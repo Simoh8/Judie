@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = db.getUserById(params.id);
+    const response = await fetch(`${BACKEND_URL}/api/users/${params.id}/`);
+    const data = await response.json();
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ success: true, user });
+    return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error("Get user error:", error);
     return NextResponse.json(
@@ -31,16 +26,18 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const user = db.updateUser(params.id, body);
+    
+    const response = await fetch(`${BACKEND_URL}/api/users/${params.id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "User not found" },
-        { status: 404 }
-      );
-    }
+    const data = await response.json();
 
-    return NextResponse.json({ success: true, user });
+    return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error("Update user error:", error);
     return NextResponse.json(

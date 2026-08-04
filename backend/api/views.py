@@ -12,8 +12,8 @@ import os
 import re
 import jwt
 import requests as http_requests
-from .models import User, Session, Booking
-from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer
+from .models import User, Session, Booking, Review
+from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer
 
 
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
@@ -386,6 +386,14 @@ class SessionViewSet(viewsets.ModelViewSet):
             'count': len(participants)
         })
 
+    @action(detail=True, methods=['get'])
+    def reviews(self, request, pk=None):
+        """Get all reviews for a session"""
+        session = self.get_object()
+        reviews = session.reviews.all()
+        serializer = ReviewSerializer(reviews, many=True)
+        return Response({'success': True, 'reviews': serializer.data})
+
     @action(detail=False, methods=['get'])
     @permission_classes([permissions.IsAdminUser])
     def stats(self, request):
@@ -419,4 +427,48 @@ class UserViewSet(viewsets.ModelViewSet):
         sessions = [booking.session for booking in bookings]
         serializer = SessionSerializer(sessions, many=True)
         return Response({'success': True, 'sessions': serializer.data})
+
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return ReviewCreateSerializer
+        return ReviewSerializer
+
+    def get_queryset(self):
+        queryset = Review.objects.all()
+        session_id = self.request.query_params.get('session')
+        user_id = self.request.query_params.get('user')
+
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Verify user participated in the session
+        session = serializer.validated_data['session']
+        user = serializer.validated_data['user']
+        
+        if not Booking.objects.filter(session=session, user=user, status='completed').exists():
+            return Response(
+                {'success': False, 'error': 'User must have completed the session to review it'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        self.perform_create(serializer)
+        return Response({'success': True, 'review': ReviewSerializer(serializer.instance).data}, status=status.HTTP_201_CREATED)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'success': True, 'reviews': serializer.data})
 
