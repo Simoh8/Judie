@@ -30,6 +30,8 @@ class User(AbstractUser):
     focus_hours = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     sessions_joined = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    password_reset_token = models.CharField(max_length=255, blank=True, null=True)
+    password_reset_token_expires = models.DateTimeField(blank=True, null=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
@@ -62,12 +64,39 @@ class Session(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    leader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='led_sessions')
+    
+    # Zoom integration fields
+    zoom_meeting_id = models.CharField(max_length=200, blank=True, null=True)
+    zoom_join_url = models.URLField(blank=True, null=True)
+    zoom_start_url = models.URLField(blank=True, null=True)
+    zoom_password = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
         return self.title
 
     class Meta:
         ordering = ['scheduled_for']
+
+
+class LeadRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='lead_requests')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lead_requests')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.session.title} ({self.status})"
+
+    class Meta:
+        ordering = ['-created_at']
 
 
 class Booking(models.Model):

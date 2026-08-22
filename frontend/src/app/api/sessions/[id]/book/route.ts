@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export async function POST(
   request: NextRequest,
@@ -16,16 +17,19 @@ export async function POST(
       );
     }
 
-    const booking = db.bookSession(params.id, userId);
+    const response = await fetch(`${BACKEND_URL}/api/sessions/${params.id}/book/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
 
-    if (!booking) {
-      return NextResponse.json(
-        { success: false, error: "Could not book session" },
-        { status: 400 }
-      );
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
     }
 
-    return NextResponse.json({ success: true, booking });
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Book session error:", error);
     return NextResponse.json(

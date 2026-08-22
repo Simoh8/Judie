@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import User, Session, Booking, Review
+from .models import User, Session, Booking, Review, LeadRequest
 
 
 class UserSerializer(serializers.ModelSerializer):
-    firstName = serializers.CharField(source='first_name', read_only=True)
-    lastName = serializers.CharField(source='last_name', read_only=True)
+    firstName = serializers.CharField(source='first_name', required=False)
+    lastName = serializers.CharField(source='last_name', required=False)
     focusHours = serializers.DecimalField(source='focus_hours', read_only=True, max_digits=5, decimal_places=2)
     sessionsJoined = serializers.IntegerField(source='sessions_joined', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email', 'username', 'firstName', 'lastName', 'focusHours', 'sessionsJoined', 'createdAt', 'isStaff']
-        read_only_fields = ['id', 'focusHours', 'sessionsJoined', 'createdAt', 'isStaff']
+        read_only_fields = ['id', 'email', 'username', 'focusHours', 'sessionsJoined', 'createdAt', 'isStaff']
 
 
 class SessionSerializer(serializers.ModelSerializer):
@@ -22,12 +22,19 @@ class SessionSerializer(serializers.ModelSerializer):
     currentParticipants = serializers.IntegerField(source='current_participants', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     averageRating = serializers.SerializerMethodField()
+    leader = UserSerializer(read_only=True)
+    zoomMeetingId = serializers.CharField(source='zoom_meeting_id', read_only=True)
+    zoomJoinUrl = serializers.URLField(source='zoom_join_url', read_only=True)
+    zoomStartUrl = serializers.URLField(source='zoom_start_url', read_only=True)
+    zoomPassword = serializers.CharField(source='zoom_password', read_only=True)
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'type', 'duration', 'scheduledFor', 'facilitator',
-                  'maxParticipants', 'currentParticipants', 'status', 'description', 'createdAt', 'averageRating']
-        read_only_fields = ['id', 'currentParticipants', 'createdAt', 'averageRating']
+                  'maxParticipants', 'currentParticipants', 'status', 'description', 'createdAt', 'averageRating', 'leader',
+                  'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword']
+        read_only_fields = ['id', 'currentParticipants', 'createdAt', 'averageRating', 'leader',
+                           'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword']
 
     def get_averageRating(self, obj):
         reviews = obj.reviews.all()
@@ -68,3 +75,35 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ['session', 'user', 'rating', 'comment']
+
+
+class LeadRequestSerializer(serializers.ModelSerializer):
+    session = SessionSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = LeadRequest
+        fields = ['id', 'session', 'user', 'status', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'createdAt', 'updatedAt']
+
+
+class LeadRequestCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeadRequest
+        fields = ['session', 'user']
+
+    def validate(self, attrs):
+        session = attrs['session']
+        user = attrs['user']
+        
+        # Check for existing request
+        existing = LeadRequest.objects.filter(session=session, user=user).first()
+        if existing:
+            if existing.status == 'pending':
+                raise serializers.ValidationError('You already have a pending request for this session')
+            # Allow resubmission by deleting old request
+            existing.delete()
+        
+        return attrs

@@ -1,46 +1,79 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserStore } from "@/stores/userStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
-import { User, Mail, Calendar, Clock, Users, Save } from "lucide-react";
+import { User, Mail, Calendar, Clock, Users, Save, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function Profile() {
   const { user } = useAuth();
   const { updateUser } = useUserStore();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
     email: user?.email || "",
   });
 
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+      });
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  const handleEditStart = () => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+      });
+    }
+    setEditing(true);
+  };
+
   const handleSave = async () => {
     if (!user?.id) return;
-    
+
     setLoading(true);
     try {
       await updateUser({
-        first_name: formData.firstName,
-        last_name: formData.lastName,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
       });
       setEditing(false);
+      setToast({ type: "success", message: "Profile updated successfully!" });
     } catch (error) {
       console.error("Failed to update profile:", error);
+      setToast({ type: "error", message: "Failed to update profile. Please try again." });
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    setFormData({
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
-      email: user?.email || "",
-    });
+    if (user) {
+      setFormData({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+      });
+    }
     setEditing(false);
   };
 
@@ -48,6 +81,25 @@ export default function Profile() {
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 dark:bg-ios-gray-900/50">
         <Navbar />
+
+        {/* Toast notification */}
+        {toast && (
+          <div
+            className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-lg animate-slide-down transition-all duration-300 ${
+              toast.type === "success"
+                ? "bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-300"
+                : "bg-red-50 dark:bg-red-900/40 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle size={18} className="shrink-0 text-green-500" />
+            ) : (
+              <AlertCircle size={18} className="shrink-0 text-red-500" />
+            )}
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        )}
+
         <main className="pt-24 px-6 pb-12">
           <div className="max-w-4xl mx-auto">
             <div className="mb-8 animate-slide-up">
@@ -76,7 +128,7 @@ export default function Profile() {
                     <h3 className="text-lg font-semibold text-foreground">Personal Information</h3>
                     {!editing ? (
                       <button
-                        onClick={() => setEditing(true)}
+                        onClick={handleEditStart}
                         className="btn-ios btn-secondary text-sm"
                       >
                         Edit

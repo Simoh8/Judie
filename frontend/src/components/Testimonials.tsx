@@ -1,9 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 
-const testimonials = [
+interface Review {
+  id: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+const defaultTestimonials = [
   {
     name: "Sarah Chen",
     role: "Software Engineer",
@@ -28,14 +41,42 @@ const testimonials = [
 ];
 
 export default function Testimonials() {
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchReviews() {
+      try {
+        const response = await fetch('/api/reviews');
+        const data = await response.json();
+        if (data.success && data.reviews.length > 0) {
+          setReviews(data.reviews);
+        }
+      } catch (error) {
+        console.error("Failed to fetch reviews:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchReviews();
+  }, []);
+
+  const displayReviews = reviews.length > 0 ? reviews.map(review => ({
+    name: `${review.user.firstName} ${review.user.lastName}`,
+    role: "Community Member",
+    content: review.comment,
+    rating: review.rating,
+    avatar: `${review.user.firstName[0]}${review.user.lastName[0]}`.toUpperCase(),
+  })) : defaultTestimonials;
 
   const nextTestimonial = () => {
-    setCurrentIndex((prev) => (prev + 1) % testimonials.length);
+    setCurrentIndex((prev) => (prev + 1) % displayReviews.length);
   };
 
   const prevTestimonial = () => {
-    setCurrentIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length);
+    setCurrentIndex((prev) => (prev - 1 + displayReviews.length) % displayReviews.length);
   };
 
   return (
@@ -56,25 +97,25 @@ export default function Testimonials() {
             
             <div className="flex flex-col items-center text-center">
               <div className="flex gap-1 mb-6">
-                {[...Array(testimonials[currentIndex].rating)].map((_, i) => (
+                {[...Array(displayReviews[currentIndex].rating)].map((_, i) => (
                   <Star key={i} size={20} className="fill-ios-orange text-ios-orange" />
                 ))}
               </div>
 
               <blockquote className="text-2xl md:text-3xl font-medium text-foreground mb-8 leading-relaxed">
-                &ldquo;{testimonials[currentIndex].content}&rdquo;
+                &ldquo;{displayReviews[currentIndex].content}&rdquo;
               </blockquote>
 
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-ios-blue to-ios-purple flex items-center justify-center text-white font-bold text-xl">
-                  {testimonials[currentIndex].avatar}
+                  {displayReviews[currentIndex].avatar}
                 </div>
                 <div className="text-left">
                   <div className="font-semibold text-foreground text-lg">
-                    {testimonials[currentIndex].name}
+                    {displayReviews[currentIndex].name}
                   </div>
                   <div className="text-foreground/60">
-                    {testimonials[currentIndex].role}
+                    {displayReviews[currentIndex].role}
                   </div>
                 </div>
               </div>
@@ -89,7 +130,7 @@ export default function Testimonials() {
                 </button>
 
                 <div className="flex gap-2">
-                  {testimonials.map((_, index) => (
+                  {displayReviews.map((_: any, index: number) => (
                     <button
                       key={index}
                       onClick={() => setCurrentIndex(index)}

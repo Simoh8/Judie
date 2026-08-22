@@ -8,12 +8,14 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from django.db import transaction
 from django.conf import settings
+from django.core.mail import send_mail
 import os
 import re
 import jwt
 import requests as http_requests
-from .models import User, Session, Booking, Review
-from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer
+from .models import User, Session, Booking, Review, LeadRequest
+from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer
+from .zoom_service import ZoomService
 
 
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
@@ -267,8 +269,31 @@ class SessionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response({'success': True, 'session': serializer.data}, status=status.HTTP_201_CREATED)
+        
+        # Create the session first
+        session = serializer.save()
+        
+        # Generate Zoom meeting
+        zoom_meeting = ZoomService.create_meeting(
+            topic=session.title,
+            start_time=session.scheduled_for,
+            duration_minutes=session.duration
+        )
+        
+        if zoom_meeting:
+            session.zoom_meeting_id = zoom_meeting['meeting_id']
+            session.zoom_join_url = zoom_meeting['join_url']
+            session.zoom_start_url = zoom_meeting['start_url']
+            session.zoom_password = zoom_meeting['password']
+            session.save()
+        
+        return Response({'success': True, 'session': SessionSerializer(session).data}, status=status.HTTP_201_CREATED)
+
+    def perform_destroy(self, instance):
+        # Clean up associated Zoom meeting if present
+        if instance.zoom_meeting_id:
+            ZoomService.delete_meeting(instance.zoom_meeting_id)
+        instance.delete()
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -298,23 +323,262 @@ class SessionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if Booking.objects.filter(session=session, user=user).exists():
+        # Check for existing confirmed booking
+        if Booking.objects.filter(session=session, user=user, status='confirmed').exists():
             return Response(
                 {'success': False, 'error': 'Already booked'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        booking = Booking.objects.create(session=session, user=user)
+        # Reuse cancelled booking if exists, otherwise create new
+        booking = Booking.objects.filter(session=session, user=user).first()
+        if booking:
+            booking.status = 'confirmed'
+            booking.save()
+        else:
+            booking = Booking.objects.create(session=session, user=user)
+            user.sessions_joined += 1
+            user.save()
         session.current_participants += 1
         session.save()
+
+        # Send email with Zoom details
+        if session.zoom_join_url:
+            try:
+                subject = f"Booking Confirmed: {session.title}"
+                first_name = user.first_name or user.email.split('@')[0]
+                scheduled_str = session.scheduled_for.strftime('%Y-%m-%d %H:%M')
+                
+                # Plain text fallback
+                message = f'''Hi {first_name},
+
+You have successfully booked the session "{session.title}".
+
+Session Details:
+- Title: {session.title}
+- Type: {session.get_type_display()}
+- Scheduled: {scheduled_str}
+- Duration: {session.duration} minutes
+- Facilitator: {session.facilitator}
+
+Zoom Meeting Details:
+- Join URL: {session.zoom_join_url}
+- Meeting ID: {session.zoom_meeting_id}
+- Password: {session.zoom_password}
+
+Please join the meeting a few minutes before the scheduled start time.
+
+See you there!
+'''
+                # Premium HTML email design
+                html_message = f'''<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Session Booking is Confirmed</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f4f5f6;
+      color: #1a1a1a;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      width: 100%;
+      background-color: #f4f5f6;
+      padding: 20px 0;
+    }}
+    .container {{
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }}
+    .header {{
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      padding: 32px 24px;
+      text-align: center;
+    }}
+    .header h1 {{
+      color: #ffffff;
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }}
+    .content {{
+      padding: 32px 24px;
+    }}
+    .greeting {{
+      font-size: 18px;
+      font-weight: 600;
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: #0f172a;
+    }}
+    .intro {{
+      font-size: 16px;
+      line-height: 24px;
+      color: #475569;
+      margin-bottom: 24px;
+    }}
+    .card {{
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }}
+    .card-title {{
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-top: 0;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 8px;
+    }}
+    .detail-row {{
+      margin-bottom: 8px;
+      font-size: 14px;
+      line-height: 20px;
+    }}
+    .detail-label {{
+      color: #64748b;
+      font-weight: 500;
+      display: inline-block;
+      width: 120px;
+    }}
+    .detail-value {{
+      color: #0f172a;
+      font-weight: 600;
+    }}
+    .zoom-box {{
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }}
+    .zoom-title {{
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e40af;
+      margin-top: 0;
+      margin-bottom: 12px;
+    }}
+    .zoom-credentials {{
+      font-size: 14px;
+      color: #1e3a8a;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }}
+    .zoom-btn-container {{
+      text-align: center;
+      margin-top: 16px;
+    }}
+    .zoom-btn {{
+      display: inline-block;
+      background-color: #2563eb;
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 12px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 6px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+    }}
+    .footer {{
+      padding: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      background-color: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+    }}
+    .footer p {{
+      margin: 4px 0;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>Booking Confirmed</h1>
+      </div>
+      <div class="content">
+        <p class="greeting">Hi {first_name},</p>
+        <p class="intro">You have successfully booked the session <strong>"{session.title}"</strong>. Here are your details and Zoom join link:</p>
         
-        user.sessions_joined += 1
-        user.save()
+        <div class="card">
+          <div class="card-title">Session Information</div>
+          <div class="detail-row">
+            <span class="detail-label">Title</span>
+            <span class="detail-value">{session.title}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Type</span>
+            <span class="detail-value">{session.get_type_display()}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Date & Time</span>
+            <span class="detail-value">{scheduled_str}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Duration</span>
+            <span class="detail-value">{session.duration} minutes</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Facilitator</span>
+            <span class="detail-value">{session.facilitator}</span>
+          </div>
+        </div>
+        
+        <div class="zoom-box">
+          <div class="zoom-title">🎥 Zoom Meeting Details</div>
+          <div class="zoom-credentials">
+            <div style="margin-bottom: 6px;"><strong>Meeting ID:</strong> {session.zoom_meeting_id}</div>
+            <div><strong>Password:</strong> {session.zoom_password}</div>
+          </div>
+          <div class="zoom-btn-container">
+            <a href="{session.zoom_join_url}" target="_blank" class="zoom-btn">Join Zoom Call</a>
+          </div>
+        </div>
+        
+        <p class="intro" style="margin-bottom: 0; font-size: 14px; color: #64748b;">Please join the meeting a few minutes before the scheduled start time. See you there!</p>
+      </div>
+      <div class="footer">
+        <p>&copy; 2026 Flown. All rights reserved.</p>
+        <p>This is an automated notification. Please do not reply directly to this email.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+'''
+                send_mail(
+                    subject,
+                    message,
+                    getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@flown.com'),
+                    [user.email],
+                    html_message=html_message,
+                    fail_silently=True,
+                )
+            except Exception as e:
+                print(f"Failed to send Zoom details email: {e}")
 
         serializer = BookingSerializer(booking)
         return Response({'success': True, 'booking': serializer.data})
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def cancel_booking(self, request, pk=None):
         session = self.get_object()
         user_id = request.data.get('user_id')
@@ -333,6 +597,9 @@ class SessionViewSet(viewsets.ModelViewSet):
 
         session.current_participants = max(0, session.current_participants - 1)
         session.save()
+
+        user.sessions_joined = max(0, user.sessions_joined - 1)
+        user.save()
 
         return Response({'success': True, 'message': 'Booking cancelled'})
 
@@ -420,6 +687,24 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'success': True, 'users': serializer.data})
+
+    def retrieve(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(user)
+        return Response({'success': True, 'user': serializer.data})
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({'success': True, 'user': serializer.data})
+
     @action(detail=True, methods=['get'])
     def sessions(self, request, pk=None):
         user = self.get_object()
@@ -471,4 +756,141 @@ class ReviewViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response({'success': True, 'reviews': serializer.data})
+
+
+class LeadRequestViewSet(viewsets.ModelViewSet):
+    queryset = LeadRequest.objects.all()
+    serializer_class = LeadRequestSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return LeadRequestCreateSerializer
+        return LeadRequestSerializer
+
+    def get_queryset(self):
+        queryset = LeadRequest.objects.all()
+        session_id = self.request.query_params.get('session')
+        user_id = self.request.query_params.get('user')
+        status_filter = self.request.query_params.get('status')
+
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'success': True, 'leadRequests': serializer.data})
+
+    def create(self, request, *args, **kwargs):
+        # Extract session and user from request data before validation
+        session_id = request.data.get('session')
+        user_id = request.data.get('user')
+        
+        # Check for existing request and delete if not pending
+        existing_request = LeadRequest.objects.filter(session_id=session_id, user_id=user_id).first()
+        if existing_request:
+            if existing_request.status == 'pending':
+                return Response(
+                    {'success': False, 'error': 'You already have a pending request for this session'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Delete rejected/approved requests to allow resubmission
+            existing_request.delete()
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Verify user has booked the session
+        session = serializer.validated_data['session']
+        user = serializer.validated_data['user']
+
+        if not Booking.objects.filter(session=session, user=user, status='confirmed').exists():
+            return Response(
+                {'success': False, 'error': 'User must have booked the session to request to lead'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        self.perform_create(serializer)
+        
+        # Send email notification to admin
+        try:
+            admin_email = getattr(settings, 'ADMIN_EMAIL', 'admin@flown.com')
+            subject = f'New Lead Request: {user.email} wants to lead "{session.title}"'
+            message = f'''
+User {user.email} ({user.get_full_name() or user.email}) has requested to lead the session "{session.title}".
+
+Session Details:
+- Title: {session.title}
+- Type: {session.get_type_display()}
+- Scheduled: {session.scheduled_for.strftime('%Y-%m-%d %H:%M')}
+- Duration: {session.duration} minutes
+
+You can approve or reject this request in the admin dashboard.
+'''
+            send_mail(
+                subject,
+                message,
+                getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@flown.com'),
+                [admin_email],
+                fail_silently=True,
+            )
+        except Exception as e:
+            # Log error but don't fail the request if email fails
+            print(f"Failed to send email notification: {e}")
+        
+        return Response({'success': True, 'leadRequest': LeadRequestSerializer(serializer.instance).data}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    @permission_classes([permissions.IsAdminUser])
+    def approve(self, request, pk=None):
+        """Admin action to approve a lead request"""
+        lead_request = self.get_object()
+        
+        if lead_request.status != 'pending':
+            return Response(
+                {'success': False, 'error': 'Request is not pending'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            # Set the session leader
+            lead_request.session.leader = lead_request.user
+            lead_request.session.save()
+
+            # Update lead request status
+            lead_request.status = 'approved'
+            lead_request.save()
+
+            # Reject all other pending requests for this session
+            LeadRequest.objects.filter(
+                session=lead_request.session,
+                status='pending'
+            ).exclude(id=lead_request.id).update(status='rejected')
+
+        serializer = self.get_serializer(lead_request)
+        return Response({'success': True, 'leadRequest': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    @permission_classes([permissions.IsAdminUser])
+    def reject(self, request, pk=None):
+        """Admin action to reject a lead request"""
+        lead_request = self.get_object()
+        
+        if lead_request.status != 'pending':
+            return Response(
+                {'success': False, 'error': 'Request is not pending'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        lead_request.status = 'rejected'
+        lead_request.save()
+
+        serializer = self.get_serializer(lead_request)
+        return Response({'success': True, 'leadRequest': serializer.data})
 

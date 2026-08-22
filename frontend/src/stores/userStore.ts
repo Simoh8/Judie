@@ -133,9 +133,11 @@ export const useUserStore = create<UserStore>((set, get) => ({
         localStorage.setItem('user', JSON.stringify(response.user));
       } else {
         set({ error: 'Failed to update user', loading: false });
+        throw new Error(response.error || 'Failed to update user');
       }
     } catch (error) {
       set({ error: 'Failed to update user', loading: false });
+      throw error;
     }
   },
 

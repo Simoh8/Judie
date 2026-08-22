@@ -1,37 +1,74 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowRight, Play } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Hero() {
+  const { user, loading } = useAuth();
+
   return (
     <section className="min-h-screen flex items-center justify-center pt-20 px-6 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-ios-gray-900 dark:via-black dark:to-ios-gray-800 -z-10" />
       
       <div className="max-w-5xl mx-auto text-center">
         <div className="animate-slide-up">
-          <span className="inline-block px-4 py-2 rounded-full bg-ios-blue/10 text-ios-blue text-sm font-medium mb-6">
-            Neuroscience-backed focus
+          <span className="inline-block px-4 py-2 rounded-full bg-ios-blue/10 text-ios-blue text-sm font-medium mb-6 transition-all duration-300">
+            {!loading && user ? `Welcome back, ${user.firstName || user.email?.split('@')[0]} 👋` : "Neuroscience-backed focus"}
           </span>
           
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 text-foreground">
-            Less distraction.
-            <br />
-            <span className="text-ios-blue">More feel-good focus.</span>
-          </h1>
+          {!loading && user ? (
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 text-foreground animate-fade-in">
+              Welcome back,
+              <br />
+              <span className="text-ios-blue">{user.firstName || user.email?.split('@')[0]}</span>.
+            </h1>
+          ) : (
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 text-foreground">
+              Less distraction.
+              <br />
+              <span className="text-ios-blue">More feel-good focus.</span>
+            </h1>
+          )}
           
-          <p className="text-xl md:text-2xl text-foreground/70 mb-10 max-w-3xl mx-auto leading-relaxed">
-            Work silently alongside others in virtual body doubling sessions that boost focus and accountability. Especially effective for those with ADHD.
-          </p>
+          {!loading && user ? (
+            <p className="text-xl md:text-2xl text-foreground/70 mb-10 max-w-3xl mx-auto leading-relaxed animate-fade-in">
+              Ready for another productive co-working session? Connect with your virtual body doubling partners and hit your goals today.
+            </p>
+          ) : (
+            <p className="text-xl md:text-2xl text-foreground/70 mb-10 max-w-3xl mx-auto leading-relaxed">
+              Work silently alongside others in virtual body doubling sessions that boost focus and accountability. Especially effective for those with ADHD.
+            </p>
+          )}
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <button className="btn-ios btn-primary text-lg px-8 py-4 flex items-center gap-2">
-              Start your free trial
-              <ArrowRight size={20} />
-            </button>
-            <button className="btn-ios btn-secondary text-lg px-8 py-4 flex items-center gap-2">
-              <Play size={20} className="fill-current" />
-              Watch demo
-            </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 h-[60px]">
+            {loading ? (
+              <>
+                <div className="w-52 h-[60px] bg-foreground/5 animate-pulse rounded-2xl" />
+                <div className="w-40 h-[60px] bg-foreground/5 animate-pulse rounded-2xl" />
+              </>
+            ) : user ? (
+              <>
+                <Link href="/dashboard" className="btn-ios btn-primary text-lg px-8 py-4 flex items-center gap-2">
+                  Go to Dashboard
+                  <ArrowRight size={20} />
+                </Link>
+                <Link href="/my-sessions" className="btn-ios btn-secondary text-lg px-8 py-4 flex items-center gap-2">
+                  My Sessions
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="#signup" className="btn-ios btn-primary text-lg px-8 py-4 flex items-center gap-2">
+                  Start your free trial
+                  <ArrowRight size={20} />
+                </Link>
+                <Link href="/demo" className="btn-ios btn-secondary text-lg px-8 py-4 flex items-center gap-2">
+                  <Play size={20} className="fill-current" />
+                  Watch demo
+                </Link>
+              </>
+            )}
           </div>
         </div>
 

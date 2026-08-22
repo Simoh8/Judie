@@ -23,6 +23,10 @@ export interface Session {
   participants: string[]; // user IDs
   status: "scheduled" | "live" | "completed";
   description: string;
+  zoomMeetingId?: string;
+  zoomJoinUrl?: string;
+  zoomStartUrl?: string;
+  zoomPassword?: string;
 }
 
 export interface SessionBooking {

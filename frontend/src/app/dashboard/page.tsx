@@ -3,15 +3,20 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useUserStore } from "@/stores/userStore";
 import { Session } from "@/lib/types";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
-import { Calendar, Clock, Users, TrendingUp, Star } from "lucide-react";
+import { Calendar, Clock, Users, TrendingUp, Star, Crown } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { sessions, loading } = useSessionStore();
+  const { updateUser } = useUserStore();
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
+  const [userSessionIds, setUserSessionIds] = useState<Set<string>>(new Set());
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
+  const [leadRequestStatuses, setLeadRequestStatuses] = useState<Record<string, string>>({});
 
   useEffect(() => {
     useSessionStore.getState().loadSessions();
@@ -20,6 +25,46 @@ export default function Dashboard() {
   useEffect(() => {
     setUpcomingSessions(sessions.slice(0, 3));
   }, [sessions]);
+
+  const refreshUserSessions = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(`/api/users/${user.id}/sessions/`);
+      const data = await response.json();
+      if (data.success && data.sessions) {
+        // Normalise all IDs to strings to avoid number/string mismatch
+        const joinedIds = new Set<string>(data.sessions.map((s: Session) => String(s.id)));
+        setUserSessionIds(joinedIds);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user sessions:", error);
+    }
+  };
+
+  const refreshLeadRequests = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(`/api/lead-requests/?user=${user.id}`);
+      const data = await response.json();
+      if (data.success && data.leadRequests) {
+        const statuses: Record<string, string> = {};
+        data.leadRequests.forEach((req: any) => {
+          statuses[String(req.session.id)] = req.status;
+        });
+        setLeadRequestStatuses(statuses);
+      }
+    } catch (error) {
+      console.error("Failed to fetch lead requests:", error);
+    }
+  };
+
+  useEffect(() => {
+    refreshUserSessions();
+  }, [user?.id]);
+
+  useEffect(() => {
+    refreshLeadRequests();
+  }, [user?.id]);
 
   const formatTime = (date: Date | string) => {
     const d = new Date(date);
@@ -35,6 +80,82 @@ export default function Dashboard() {
     if (d.toDateString() === today.toDateString()) return "Today";
     if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const handleJoinSession = async (sessionId: string) => {
+    if (!user?.id || loadingSessionId) return;
+
+    setLoadingSessionId(sessionId);
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/book/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const data = await response.json();
+      // Treat 'Already booked' as a success (user is booked, just refresh state)
+      if (data.success || data.error === 'Already booked') {
+        await Promise.all([
+          refreshUserSessions(),
+          refreshLeadRequests(),
+        ]);
+        useSessionStore.getState().loadSessions();
+      }
+    } catch (error) {
+      console.error("Failed to join session:", error);
+    } finally {
+      setLoadingSessionId(null);
+    }
+  };
+
+  const handleCancelBooking = async (sessionId: string) => {
+    if (!user?.id || loadingSessionId) return;
+
+    setLoadingSessionId(sessionId);
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/cancel-booking/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await refreshUserSessions();
+        useSessionStore.getState().loadSessions();
+      }
+    } catch (error) {
+      console.error("Failed to cancel booking:", error);
+    } finally {
+      setLoadingSessionId(null);
+    }
+  };
+
+  const handleRequestToLead = async (sessionId: string) => {
+    if (!user?.id || loadingSessionId) return;
+
+    setLoadingSessionId(sessionId);
+    try {
+      const response = await fetch('/api/lead-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: sessionId, user: user.id }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update lead request status
+        setLeadRequestStatuses(prev => ({ ...prev, [sessionId]: 'pending' }));
+      } else {
+        alert(data.error || 'Failed to request to lead');
+      }
+    } catch (error) {
+      console.error("Failed to request to lead:", error);
+      alert('Failed to request to lead');
+    } finally {
+      setLoadingSessionId(null);
+    }
   };
 
   return (
@@ -123,6 +244,52 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
+                      {userSessionIds.has(String(session.id)) ? (
+                        <div className="space-y-2 mt-4">
+                          <button
+                            onClick={() => handleCancelBooking(session.id)}
+                            className="btn-ios btn-secondary text-sm w-full"
+                            disabled={loadingSessionId === session.id}
+                          >
+                            {loadingSessionId === session.id ? 'Cancelling...' : 'Cancel Session'}
+                          </button>
+                          {session.leader?.id === user?.id ? (
+                            <div className="flex items-center justify-center gap-2 text-green-600 text-sm font-medium">
+                              <Crown size={16} />
+                              <span>You are leading this session</span>
+                            </div>
+                          ) : leadRequestStatuses[String(session.id)] === 'pending' ? (
+                            <div className="text-center text-sm text-foreground/60">
+                              Request pending...
+                            </div>
+                          ) : leadRequestStatuses[String(session.id)] === 'approved' ? (
+                            <div className="flex items-center justify-center gap-2 text-green-600 text-sm font-medium">
+                              <Crown size={16} />
+                              <span>Request approved!</span>
+                            </div>
+                          ) : leadRequestStatuses[String(session.id)] === 'rejected' ? (
+                            <div className="text-center text-sm text-red-500">
+                              Request rejected
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleRequestToLead(session.id)}
+                              className="btn-ios btn-primary text-sm w-full"
+                              disabled={loadingSessionId === session.id}
+                            >
+                              {loadingSessionId === session.id ? 'Requesting...' : 'Request to Lead'}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleJoinSession(session.id)}
+                          className="btn-ios btn-primary text-sm w-full mt-4"
+                          disabled={session.currentParticipants >= session.maxParticipants || loadingSessionId === session.id}
+                        >
+                          {loadingSessionId === session.id ? 'Joining...' : session.currentParticipants >= session.maxParticipants ? 'Session Full' : 'Join Session'}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = db.getSessionById(params.id);
+    const response = await fetch(`${BACKEND_URL}/api/sessions/${params.id}/`);
+    const data = await response.json();
 
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: "Session not found" },
-        { status: 404 }
-      );
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
     }
 
-    return NextResponse.json({ success: true, session });
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Get session error:", error);
     return NextResponse.json(
@@ -31,16 +30,20 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const session = db.updateSession(params.id, body);
+    
+    const response = await fetch(`${BACKEND_URL}/api/sessions/${params.id}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: "Session not found" },
-        { status: 404 }
-      );
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
     }
 
-    return NextResponse.json({ success: true, session });
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Update session error:", error);
     return NextResponse.json(

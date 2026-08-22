@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
-import { AuthResponse } from "@/lib/types";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,28 +14,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user by email
-    const user = db.getUserByEmail(email);
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Invalid credentials" },
-        { status: 401 }
-      );
+    const response = await fetch(`${BACKEND_URL}/api/login/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
     }
 
-    // In production, verify password hash here
-    // For demo, we'll accept any password
-
-    // Generate a simple token (in production, use JWT)
-    const token = Buffer.from(`${user.id}:${Date.now()}`).toString("base64");
-
-    const response: AuthResponse = {
-      success: true,
-      user,
-      token,
-    };
-
-    return NextResponse.json(response);
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(

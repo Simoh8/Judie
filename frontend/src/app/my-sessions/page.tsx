@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import ReviewModal from "@/components/ReviewModal";
-import { Calendar, Clock, Users, X, Star } from "lucide-react";
+import { Calendar, Clock, Users, X, Star, Video, Copy, Check } from "lucide-react";
 
 export default function MySessions() {
   const { user } = useAuth();
@@ -17,6 +17,7 @@ export default function MySessions() {
   const [loading, setLoading] = useState(true);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchSessions() {
@@ -95,6 +96,12 @@ export default function MySessions() {
     setReviewModalOpen(true);
   };
 
+  const copyToClipboard = (text: string, meetingId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMeetingId(meetingId);
+    setTimeout(() => setCopiedMeetingId(null), 2000);
+  };
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 dark:bg-ios-gray-900/50">
@@ -148,6 +155,38 @@ export default function MySessions() {
                         </span>
                       </div>
                     </div>
+                    {session.zoomJoinUrl && (
+                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
+                          <Video size={16} />
+                          <span>Zoom Meeting</span>
+                        </div>
+                        <div className="space-y-1 text-xs text-foreground/70">
+                          <div className="flex items-center justify-between">
+                            <span>Meeting ID: {session.zoomMeetingId}</span>
+                            <button
+                              onClick={() => copyToClipboard(session.zoomMeetingId || '', session.zoomMeetingId || '')}
+                              className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
+                            >
+                              {copiedMeetingId === session.zoomMeetingId ? (
+                                <Check size={14} className="text-green-600" />
+                              ) : (
+                                <Copy size={14} />
+                              )}
+                            </button>
+                          </div>
+                          <div>Password: {session.zoomPassword}</div>
+                          <a
+                            href={session.zoomJoinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                          >
+                            Join Meeting →
+                          </a>
+                        </div>
+                      </div>
+                    )}
                     {session.status === 'completed' ? (
                       <button
                         onClick={() => openReviewModal(session)}
@@ -156,9 +195,16 @@ export default function MySessions() {
                         <Star size={16} />
                         Review Session
                       </button>
+                    ) : session.status === 'scheduled' ? (
+                      <button
+                        onClick={() => handleCancelBooking(session.id)}
+                        className="btn-ios btn-secondary text-sm w-full mt-4"
+                      >
+                        Cancel Session
+                      </button>
                     ) : (
                       <button className="btn-ios btn-primary text-sm w-full mt-4">
-                        {session.status === 'live' ? 'Join Now' : 'Join Session'}
+                        Join Now
                       </button>
                     )}
                   </div>

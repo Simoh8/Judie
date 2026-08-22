@@ -6,13 +6,15 @@ import { useSessionStore } from "@/stores/sessionStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight } from "lucide-react";
+import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight, Crown, Check, X } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const { getStats } = useSessionStore();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [leadRequests, setLeadRequests] = useState<any[]>([]);
+  const [loadingLeadRequests, setLoadingLeadRequests] = useState(true);
 
   // Temporary admin check - allow admin@flown.com regardless of isStaff field
   const isAdmin = user?.isStaff || user?.email === 'admin@flown.com';
@@ -28,9 +30,58 @@ export default function AdminDashboardPage() {
     }
   }, [getStats]);
 
+  const loadLeadRequests = useCallback(async () => {
+    try {
+      const response = await fetch('/api/lead-requests?status=pending');
+      const data = await response.json();
+      if (data.success && data.leadRequests) {
+        setLeadRequests(data.leadRequests);
+      }
+    } catch (error) {
+      console.error("Failed to load lead requests:", error);
+    } finally {
+      setLoadingLeadRequests(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStats();
-  }, [loadStats]);
+    loadLeadRequests();
+  }, [loadStats, loadLeadRequests]);
+
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      const response = await fetch(`/api/lead-requests/${requestId}/approve`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadLeadRequests();
+      } else {
+        alert(data.error || 'Failed to approve request');
+      }
+    } catch (error) {
+      console.error("Failed to approve request:", error);
+      alert('Failed to approve request');
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      const response = await fetch(`/api/lead-requests/${requestId}/reject`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadLeadRequests();
+      } else {
+        alert(data.error || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error("Failed to reject request:", error);
+      alert('Failed to reject request');
+    }
+  };
 
   if (!isAdmin) {
     return (
@@ -160,6 +211,66 @@ export default function AdminDashboardPage() {
                     <ArrowRight className="text-foreground/40" size={20} />
                   </a>
                 </div>
+              </div>
+
+              {/* Pending Lead Requests */}
+              <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-foreground">Pending Lead Requests</h2>
+                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300 text-sm font-medium px-3 py-1 rounded-full">
+                    {leadRequests.length} pending
+                  </span>
+                </div>
+                {loadingLeadRequests ? (
+                  <div className="text-center py-8 text-foreground/60">Loading lead requests...</div>
+                ) : leadRequests.length === 0 ? (
+                  <div className="text-center py-8 text-foreground/60">No pending lead requests</div>
+                ) : (
+                  <div className="space-y-4">
+                    {leadRequests.map((request) => (
+                      <div key={request.id} className="p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Crown className="text-purple-500" size={18} />
+                              <span className="font-medium text-foreground">{request.user.firstName} {request.user.lastName}</span>
+                              <span className="text-sm text-foreground/60">({request.user.email})</span>
+                            </div>
+                            <div className="text-sm text-foreground/70 mb-2">
+                              wants to lead: <span className="font-medium text-foreground">{request.session.title}</span>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-foreground/60">
+                              <span className="flex items-center gap-1">
+                                <Calendar size={14} />
+                                {new Date(request.session.scheduledFor).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock size={14} />
+                                {new Date(request.session.scheduledFor).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              onClick={() => handleApproveRequest(request.id)}
+                              className="p-2 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                              title="Approve"
+                            >
+                              <Check size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleRejectRequest(request.id)}
+                              className="p-2 bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                              title="Reject"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Activity Overview */}
