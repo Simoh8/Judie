@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Mail, Lock, User } from "lucide-react";
+import { X, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface AuthModalProps {
@@ -18,6 +18,7 @@ export default function AuthModal({
   const [mode, setMode] = useState<"login" | "signup">(defaultMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,6 +43,7 @@ export default function AuthModal({
         onClose();
         setEmail("");
         setPassword("");
+        setShowPassword(false);
         setName("");
       } else {
         setError(mode === "login" ? "Invalid credentials" : "Signup failed");
@@ -175,17 +177,36 @@ export default function AuthModal({
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40"
               />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-ios-gray-200 dark:border-ios-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-ios-blue text-foreground"
+                className="w-full pl-10 pr-12 py-3 rounded-xl border border-ios-gray-200 dark:border-ios-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-ios-blue text-foreground"
                 placeholder="••••••••"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
           </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
+
+          {mode === "login" && (
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => window.location.href = "/forgot-password"}
+                className="text-sm text-ios-blue hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"

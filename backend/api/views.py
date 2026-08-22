@@ -16,6 +16,7 @@ import requests as http_requests
 from .models import User, Session, Booking, Review, LeadRequest
 from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer
 from .zoom_service import ZoomService
+from .email_service import EmailService
 
 
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
@@ -230,6 +231,145 @@ class GoogleOAuthCallbackView(APIView):
             f"&name={user.get_full_name()}"
         )
         return redirect(redirect_url)
+
+
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        """Initiate password reset by sending email with reset link"""
+        email = request.data.get('email')
+        
+        if not email:
+            return Response(
+                {'success': False, 'error': 'Email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate email format
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return Response(
+                {'success': False, 'error': 'Invalid email format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Don't reveal if email exists for security
+            return Response({
+                'success': True,
+                'message': 'If an account with this email exists, a password reset link has been sent.'
+            })
+        
+        # Generate reset token
+        import secrets
+        reset_token = secrets.token_urlsafe(32)
+        reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        
+        # Save token to user
+        user.password_reset_token = reset_token
+        user.password_reset_token_expires = reset_token_expires
+        user.save()
+        
+        # Generate reset link
+        frontend_url = settings.FRONTEND_URL
+        reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+        
+        # Send email
+        user_name = user.first_name or user.email.split('@')[0]
+        email_sent = EmailService.send_password_reset_email(
+            to_email=user.email,
+            user_name=user_name,
+            reset_link=reset_link
+        )
+        
+        if not email_sent:
+            return Response(
+                {'success': False, 'error': 'Failed to send reset email'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        return Response({
+            'success': True,
+            'message': 'If an account with this email exists, a password reset link has been sent.'
+        })
+
+
+class ResetPasswordView(APIView):
+    def post(self, request):
+        """Reset password using valid token"""
+        token = request.data.get('token')
+        new_password = request.data.get('password')
+        
+        if not token or not new_password:
+            return Response(
+                {'success': False, 'error': 'Token and password are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate password strength
+        if len(new_password) < 8:
+            return Response(
+                {'success': False, 'error': 'Password must be at least 8 characters'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Find user with valid token
+        try:
+            user = User.objects.get(
+                password_reset_token=token,
+                password_reset_token_expires__gt=timezone.now()
+            )
+        except User.DoesNotExist:
+            return Response(
+                {'success': False, 'error': 'Invalid or expired reset token'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Reset password
+        user.set_password(new_password)
+        user.password_reset_token = None
+        user.password_reset_token_expires = None
+        user.save()
+        
+        # Send confirmation email
+        user_name = user.first_name or user.email.split('@')[0]
+        EmailService.send_password_reset_confirmation_email(
+            to_email=user.email,
+            user_name=user_name
+        )
+        
+        return Response({
+            'success': True,
+            'message': 'Password has been reset successfully'
+        })
+
+
+class VerifyResetTokenView(APIView):
+    def get(self, request):
+        """Verify if a reset token is valid"""
+        token = request.query_params.get('token')
+        
+        if not token:
+            return Response(
+                {'success': False, 'error': 'Token is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(
+                password_reset_token=token,
+                password_reset_token_expires__gt=timezone.now()
+            )
+            return Response({
+                'success': True,
+                'valid': True,
+                'email': user.email
+            })
+        except User.DoesNotExist:
+            return Response({
+                'success': True,
+                'valid': False
+            })
 
 
 class SessionViewSet(viewsets.ModelViewSet):
