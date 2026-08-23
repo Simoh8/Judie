@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Mail, ExternalLink, FileText, TrendingUp, Award, Globe } from "lucide-react";
+import { Download, Mail, ExternalLink, FileText, TrendingUp, Award, Globe, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
