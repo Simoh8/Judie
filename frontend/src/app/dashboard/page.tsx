@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useUserStore } from "@/stores/userStore";
@@ -26,7 +26,7 @@ export default function Dashboard() {
     setUpcomingSessions(sessions.slice(0, 3));
   }, [sessions]);
 
-  const refreshUserSessions = async () => {
+  const refreshUserSessions = useCallback(async () => {
     if (!user?.id) return;
     try {
       const response = await fetch(`/api/users/${user.id}/sessions/`);
@@ -39,9 +39,9 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Failed to fetch user sessions:", error);
     }
-  };
+  }, [user?.id]);
 
-  const refreshLeadRequests = async () => {
+  const refreshLeadRequests = useCallback(async () => {
     if (!user?.id) return;
     try {
       const response = await fetch(`/api/lead-requests/?user=${user.id}`);
@@ -56,15 +56,15 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Failed to fetch lead requests:", error);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     refreshUserSessions();
-  }, [user?.id]);
+  }, [refreshUserSessions]);
 
   useEffect(() => {
     refreshLeadRequests();
-  }, [user?.id]);
+  }, [refreshLeadRequests]);
 
   const formatTime = (date: Date | string) => {
     const d = new Date(date);

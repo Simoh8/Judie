@@ -1,26 +1,27 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { Twitter, Linkedin, Instagram, Youtube } from "lucide-react";
+
+const currentYear = new Date().getFullYear();
 
 const footerLinks = {
   product: [
-    { name: "How it works", href: "/#how-it-works" },
-    { name: "Sessions", href: "/#sessions" },
-    { name: "Pricing", href: "/#pricing" },
-    { name: "For teams", href: "#" },
+    { name: "How it works", href: "/how-it-works" },
+    { name: "Sessions", href: "/sessions" },
+    { name: "Pricing", href: "/pricing" },
+    { name: "For teams", href: "/for-teams" },
   ],
   company: [
     { name: "About", href: "/about" },
-    { name: "Blog", href: "#" },
-    { name: "Careers", href: "#" },
-    { name: "Press", href: "#" },
+    { name: "Blog", href: "/blog" },
+    { name: "Careers", href: "/careers" },
+    { name: "Press", href: "/press" },
   ],
   support: [
-    { name: "Help center", href: "#" },
-    { name: "Contact", href: "#" },
-    { name: "Privacy", href: "#" },
-    { name: "Terms", href: "#" },
+    { name: "Help center", href: "/help-center" },
+    { name: "Contact", href: "/contact" },
+    { name: "Privacy", href: "/privacy" },
+    { name: "Terms", href: "/terms" },
   ],
 };
 
@@ -108,7 +109,7 @@ export default function Footer() {
 
         <div className="border-t border-ios-gray-200 dark:border-ios-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-foreground/50 text-sm">
-            © 2024 FLOWN. All rights reserved.
+            © {currentYear} FLOWN. All rights reserved.
           </p>
           <p className="text-foreground/50 text-sm">
             Made with ❤️ for focused minds

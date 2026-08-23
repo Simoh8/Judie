@@ -151,9 +151,9 @@ export default function AboutPage() {
             <div className="relative z-10">
               <Quote size={48} className="text-ios-blue/30 mb-6" />
               <blockquote className="text-2xl md:text-3xl font-semibold text-foreground leading-relaxed mb-8">
-                "The hardest part of any task isn&apos;t the work itself — it&apos;s
+                &ldquo;The hardest part of any task isn&apos;t the work itself — it&apos;s
                 getting started and staying present. FLOWN exists to solve
-                exactly that."
+                exactly that.&rdquo;
               </blockquote>
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-ios-blue to-purple-500 flex items-center justify-center text-white font-bold text-lg">
