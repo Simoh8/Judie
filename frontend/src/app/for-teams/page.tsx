@@ -166,7 +166,7 @@ export default function ForTeamsPage() {
           {/* CTA Section */}
           <div className="text-center card-ios ios-shadow-lg p-12 bg-gradient-to-br from-ios-blue/5 to-purple-500/5">
             <h2 className="text-3xl font-bold text-foreground mb-4">
-              Ready to Transform Your Team's Focus?
+              Ready to Transform Your Team&apos;s Focus?
             </h2>
             <p className="text-foreground/60 mb-8 max-w-xl mx-auto">
               Schedule a demo to see how FLOWN can help your team achieve deep work at scale.

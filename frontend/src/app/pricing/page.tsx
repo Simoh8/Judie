@@ -98,7 +98,7 @@ export default function PricingPage() {
               Simple, Transparent Pricing
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
-              Choose the plan that fits your focus goals. Start free, upgrade when you're ready.
+              Choose the plan that fits your focus goals. Start free, upgrade when you&apos;re ready.
             </p>
             <p className="text-sm text-foreground/40 mt-4">
               Last updated: {currentDate}

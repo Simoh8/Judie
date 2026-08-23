@@ -80,7 +80,7 @@ export default function ContactPage() {
               Contact Us
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
-              Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+              Have questions? We&apos;d love to hear from you. Send us a message and we&apos;ll respond as soon as possible.
             </p>
             <p className="text-sm text-foreground/40 mt-4">
               Last updated: {currentDate}
@@ -98,7 +98,7 @@ export default function ContactPage() {
                     <MessageSquare size={32} className="text-green-600 dark:text-green-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">Message Sent!</h3>
-                  <p className="text-foreground/60">We'll get back to you within 24 hours.</p>
+                  <p className="text-foreground/60">We&apos;ll get back to you within 24 hours.</p>
                   <button
                     onClick={() => setSubmitted(false)}
                     className="mt-6 text-ios-blue hover:underline"

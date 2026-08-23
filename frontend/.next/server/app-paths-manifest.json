@@ -1,9 +1,6 @@
 {
   "/page": "app/page.js",
-  "/forgot-password/page": "app/forgot-password/page.js",
-  "/reset-password/page": "app/reset-password/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/api/reviews/route": "app/api/reviews/route.js",
   "/contact/page": "app/contact/page.js",
   "/help-center/page": "app/help-center/page.js",
   "/about/page": "app/about/page.js"
