@@ -27,6 +27,12 @@ export interface Session {
   zoomJoinUrl?: string;
   zoomStartUrl?: string;
   zoomPassword?: string;
+  averageRating?: number;
+  leader?: {
+    id: string;
+    name?: string;
+    email?: string;
+  };
 }
 
 export interface SessionBooking {
