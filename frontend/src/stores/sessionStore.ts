@@ -144,17 +144,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const response = await api.bookSession(id, userId);
       if (response.success) {
-        // Handle both session data and booking data responses
-        if (response.session) {
-          set((state) => ({
-            sessions: state.sessions.map((s) => s.id === id ? response.session! : s),
-            loading: false
-          }));
-        } else {
-          // If only booking data returned, reload sessions to get updated state
-          await get().loadSessions();
-          set({ loading: false });
-        }
+        // Reload sessions to get updated participant count
+        await get().loadSessions();
+        set({ loading: false });
       } else if (response.error === 'Already booked') {
         // If already booked, just reload sessions to get current state
         await get().loadSessions();
@@ -172,17 +164,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const response = await api.cancelBooking(id, userId);
       if (response.success) {
-        // Handle both session data and message responses
-        if (response.session) {
-          set((state) => ({
-            sessions: state.sessions.map((s) => s.id === id ? response.session! : s),
-            loading: false
-          }));
-        } else {
-          // If only message returned, reload sessions to get updated state
-          await get().loadSessions();
-          set({ loading: false });
-        }
+        // Reload sessions to get updated participant count
+        await get().loadSessions();
+        set({ loading: false });
       } else {
         set({ error: 'Failed to cancel booking', loading: false });
       }
