@@ -14,7 +14,6 @@ export default function Dashboard() {
   const { sessions, loading } = useSessionStore();
   const { updateUser } = useUserStore();
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
-  const [userSessionIds, setUserSessionIds] = useState<Set<string>>(new Set());
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [leadRequestStatuses, setLeadRequestStatuses] = useState<Record<string, string>>({});
 
@@ -26,20 +25,18 @@ export default function Dashboard() {
     setUpcomingSessions(sessions.slice(0, 3));
   }, [sessions]);
 
-  const refreshUserSessions = useCallback(async () => {
+  const refreshUserData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const response = await fetch(`/api/users/${user.id}/sessions/`);
+      const response = await fetch(`/api/users/${user.id}/`);
       const data = await response.json();
-      if (data.success && data.sessions) {
-        // Normalise all IDs to strings to avoid number/string mismatch
-        const joinedIds = new Set<string>(data.sessions.map((s: Session) => String(s.id)));
-        setUserSessionIds(joinedIds);
+      if (data.success && data.user) {
+        updateUser(data.user);
       }
     } catch (error) {
-      console.error("Failed to fetch user sessions:", error);
+      console.error("Failed to refresh user data:", error);
     }
-  }, [user?.id]);
+  }, [user?.id, updateUser]);
 
   const refreshLeadRequests = useCallback(async () => {
     if (!user?.id) return;
@@ -59,12 +56,9 @@ export default function Dashboard() {
   }, [user?.id]);
 
   useEffect(() => {
-    refreshUserSessions();
-  }, [refreshUserSessions]);
-
-  useEffect(() => {
+    refreshUserData();
     refreshLeadRequests();
-  }, [refreshLeadRequests]);
+  }, [refreshUserData, refreshLeadRequests]);
 
   const formatTime = (date: Date | string) => {
     const d = new Date(date);
@@ -87,21 +81,14 @@ export default function Dashboard() {
 
     setLoadingSessionId(sessionId);
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/book/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      });
-
-      const data = await response.json();
-      // Treat 'Already booked' as a success (user is booked, just refresh state)
-      if (data.success || data.error === 'Already booked') {
-        await Promise.all([
-          refreshUserSessions(),
-          refreshLeadRequests(),
-        ]);
-        useSessionStore.getState().loadSessions();
-      }
+      // Use session store for consistency
+      await useSessionStore.getState().bookSession(sessionId, user.id);
+      
+      // Refresh user data and lead requests
+      await Promise.all([
+        refreshUserData(),
+        refreshLeadRequests(),
+      ]);
     } catch (error) {
       console.error("Failed to join session:", error);
     } finally {
@@ -114,17 +101,11 @@ export default function Dashboard() {
 
     setLoadingSessionId(sessionId);
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/cancel-booking/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        await refreshUserSessions();
-        useSessionStore.getState().loadSessions();
-      }
+      // Use session store for consistency
+      await useSessionStore.getState().cancelBooking(sessionId, user.id);
+      
+      // Refresh user data
+      await refreshUserData();
     } catch (error) {
       console.error("Failed to cancel booking:", error);
     } finally {
@@ -244,7 +225,7 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
-                      {userSessionIds.has(String(session.id)) ? (
+                      {(session as any).isBooked ? (
                         <div className="space-y-2 mt-4">
                           <button
                             onClick={() => handleCancelBooking(session.id)}

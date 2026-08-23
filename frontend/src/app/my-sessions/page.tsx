@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserStore } from "@/stores/userStore";
+import { useSessionStore } from "@/stores/sessionStore";
 import { Session } from "@/lib/types";
 import { api } from "@/lib/api";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -12,12 +13,26 @@ import { Calendar, Clock, Users, X, Star, Video, Copy, Check } from "lucide-reac
 
 export default function MySessions() {
   const { user } = useAuth();
-  const { getUserSessions } = useUserStore();
+  const { getUserSessions, updateUser } = useUserStore();
+  const { cancelBooking } = useSessionStore();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
+
+  const refreshUserData = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(`/api/users/${user.id}/`);
+      const data = await response.json();
+      if (data.success && data.user) {
+        updateUser(data.user);
+      }
+    } catch (error) {
+      console.error("Failed to refresh user data:", error);
+    }
+  }, [user?.id, updateUser]);
 
   useEffect(() => {
     async function fetchSessions() {
@@ -56,10 +71,13 @@ export default function MySessions() {
     if (!user?.id) return;
     
     try {
-      const response = await api.cancelBooking(sessionId, user.id);
-      if (response.success) {
-        setSessions(sessions.filter(s => s.id !== sessionId));
-      }
+      // Use session store for consistency
+      await cancelBooking(sessionId, user.id);
+      
+      // Refresh user data and sessions
+      await refreshUserData();
+      const userSessions = await getUserSessions();
+      setSessions(userSessions);
     } catch (error) {
       console.error("Failed to cancel booking:", error);
     }

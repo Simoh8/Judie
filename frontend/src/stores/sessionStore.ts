@@ -17,6 +17,8 @@ interface SessionStore {
   deleteSession: (id: string) => Promise<void>;
   startSession: (id: string) => Promise<void>;
   endSession: (id: string) => Promise<void>;
+  bookSession: (id: string, userId: string) => Promise<void>;
+  cancelBooking: (id: string, userId: string) => Promise<void>;
   setSearchTerm: (term: string) => void;
   setStatusFilter: (filter: string) => void;
   setTypeFilter: (filter: string) => void;
@@ -134,6 +136,58 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     } catch (error) {
       set({ error: 'Failed to end session', loading: false });
+    }
+  },
+
+  bookSession: async (id: string, userId: string) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.bookSession(id, userId);
+      if (response.success) {
+        // Handle both session data and booking data responses
+        if (response.session) {
+          set((state) => ({
+            sessions: state.sessions.map((s) => s.id === id ? response.session! : s),
+            loading: false
+          }));
+        } else {
+          // If only booking data returned, reload sessions to get updated state
+          await get().loadSessions();
+          set({ loading: false });
+        }
+      } else if (response.error === 'Already booked') {
+        // If already booked, just reload sessions to get current state
+        await get().loadSessions();
+        set({ loading: false });
+      } else {
+        set({ error: 'Failed to book session', loading: false });
+      }
+    } catch (error) {
+      set({ error: 'Failed to book session', loading: false });
+    }
+  },
+
+  cancelBooking: async (id: string, userId: string) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.cancelBooking(id, userId);
+      if (response.success) {
+        // Handle both session data and message responses
+        if (response.session) {
+          set((state) => ({
+            sessions: state.sessions.map((s) => s.id === id ? response.session! : s),
+            loading: false
+          }));
+        } else {
+          // If only message returned, reload sessions to get updated state
+          await get().loadSessions();
+          set({ loading: false });
+        }
+      } else {
+        set({ error: 'Failed to cancel booking', loading: false });
+      }
+    } catch (error) {
+      set({ error: 'Failed to cancel booking', loading: false });
     }
   },
 

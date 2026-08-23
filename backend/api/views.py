@@ -714,8 +714,9 @@ See you there!
             except Exception as e:
                 print(f"Failed to send Zoom details email: {e}")
 
-        serializer = BookingSerializer(booking)
-        return Response({'success': True, 'booking': serializer.data})
+        # Return the updated session data instead of booking data
+        session_serializer = SessionSerializer(session)
+        return Response({'success': True, 'session': session_serializer.data})
 
     @action(detail=True, methods=['post'])
     @transaction.atomic
@@ -741,7 +742,9 @@ See you there!
         user.sessions_joined = max(0, user.sessions_joined - 1)
         user.save()
 
-        return Response({'success': True, 'message': 'Booking cancelled'})
+        # Return the updated session data
+        session_serializer = SessionSerializer(session)
+        return Response({'success': True, 'session': session_serializer.data})
 
     @action(detail=True, methods=['post'])
     def start_session(self, request, pk=None):

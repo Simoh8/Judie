@@ -62,10 +62,9 @@ export default function SessionTypes() {
 
     setBookingSessionId(sessionId);
     try {
-      const response = await api.bookSession(sessionId, user.id);
-      if (response.success) {
-        router.push("/my-sessions");
-      }
+      // Use session store for consistency
+      await useSessionStore.getState().bookSession(sessionId, user.id);
+      router.push("/my-sessions");
     } catch (error) {
       console.error("Failed to book session:", error);
     } finally {
@@ -146,13 +145,22 @@ export default function SessionTypes() {
                       {session.description}
                     </p>
 
-                    <button
-                      onClick={() => handleBookSession(session.id)}
-                      disabled={isBooking}
-                      className="btn-ios btn-primary text-sm w-full disabled:opacity-50"
-                    >
-                      {isBooking ? "Booking..." : "Join Session"}
-                    </button>
+                    {(session as any).isBooked ? (
+                      <button
+                        disabled
+                        className="btn-ios btn-secondary text-sm w-full opacity-50"
+                      >
+                        Already Joined
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleBookSession(session.id)}
+                        disabled={isBooking}
+                        className="btn-ios btn-primary text-sm w-full disabled:opacity-50"
+                      >
+                        {isBooking ? "Booking..." : "Join Session"}
+                      </button>
+                    )}
                   </div>
                 </div>
               );

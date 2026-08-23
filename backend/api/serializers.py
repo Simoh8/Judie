@@ -27,20 +27,27 @@ class SessionSerializer(serializers.ModelSerializer):
     zoomJoinUrl = serializers.URLField(source='zoom_join_url', read_only=True)
     zoomStartUrl = serializers.URLField(source='zoom_start_url', read_only=True)
     zoomPassword = serializers.CharField(source='zoom_password', read_only=True)
+    isBooked = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'type', 'duration', 'scheduledFor', 'facilitator',
                   'maxParticipants', 'currentParticipants', 'status', 'description', 'createdAt', 'averageRating', 'leader',
-                  'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword']
+                  'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword', 'isBooked']
         read_only_fields = ['id', 'currentParticipants', 'createdAt', 'averageRating', 'leader',
-                           'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword']
+                           'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword', 'isBooked']
 
     def get_averageRating(self, obj):
         reviews = obj.reviews.all()
         if not reviews:
             return None
         return sum(review.rating for review in reviews) / len(reviews)
+
+    def get_isBooked(self, obj):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            return obj.bookings.filter(user=request.user, status='confirmed').exists()
+        return False
 
 
 class BookingSerializer(serializers.ModelSerializer):
