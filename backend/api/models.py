@@ -67,9 +67,9 @@ class Session(models.Model):
     leader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='led_sessions')
     
     # Zoom integration fields
-    zoom_meeting_id = models.CharField(max_length=200, blank=True, null=True)
-    zoom_join_url = models.URLField(blank=True, null=True)
-    zoom_start_url = models.URLField(blank=True, null=True)
+    zoom_meeting_id = models.CharField(max_length=50, blank=True, null=True)
+    zoom_join_url = models.URLField(blank=True, max_length=500, null=True)
+    zoom_start_url = models.URLField(blank=True, max_length=500, null=True)
     zoom_password = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
