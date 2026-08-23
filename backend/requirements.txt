@@ -8,4 +8,4 @@ python-dotenv==1.0.0
 gunicorn==23.0.0
 whitenoise==6.9.0
 psycopg2-binary==2.9.10
-zoomus==2.0.0
+zoomus==1.2.1
