@@ -39,7 +39,7 @@ export const api = {
   },
 
   // Sessions
-  async getSessions(params?: { type?: string; upcoming?: boolean }): Promise<{ success: boolean; sessions?: Session[] }> {
+  async getSessions(params?: { type?: string; upcoming?: boolean }): Promise<{ success: boolean; sessions?: Session[]; error?: string }> {
     const queryString = new URLSearchParams(params as any).toString();
     const response = await fetch(`${API_BASE}/sessions/${queryString ? `?${queryString}` : ""}`, {
       headers: getAuthHeaders(),
@@ -47,14 +47,14 @@ export const api = {
     return response.json();
   },
 
-  async getSession(id: string): Promise<{ success: boolean; session?: Session }> {
+  async getSession(id: string): Promise<{ success: boolean; session?: Session; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${id}/`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
-  async bookSession(sessionId: string, userId: string): Promise<{ success: boolean; booking?: any }> {
+  async bookSession(sessionId: string, userId: string): Promise<{ success: boolean; booking?: any; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${sessionId}/book/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -63,7 +63,7 @@ export const api = {
     return response.json();
   },
 
-  async cancelBooking(sessionId: string, userId: string): Promise<{ success: boolean; message?: string }> {
+  async cancelBooking(sessionId: string, userId: string): Promise<{ success: boolean; message?: string; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${sessionId}/cancel_booking/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -73,21 +73,21 @@ export const api = {
   },
 
   // Users
-  async getUser(id: string): Promise<{ success: boolean; user?: User }> {
+  async getUser(id: string): Promise<{ success: boolean; user?: User; error?: string }> {
     const response = await fetch(`${API_BASE}/users/${id}/`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
-  async getUserSessions(id: string): Promise<{ success: boolean; sessions?: Session[] }> {
+  async getUserSessions(id: string): Promise<{ success: boolean; sessions?: Session[]; error?: string }> {
     const response = await fetch(`${API_BASE}/users/${id}/sessions/`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
-  async updateUser(id: string, updates: Partial<User>): Promise<{ success: boolean; user?: User }> {
+  async updateUser(id: string, updates: Partial<User>): Promise<{ success: boolean; user?: User; error?: string }> {
     const response = await fetch(`${API_BASE}/users/${id}/`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -97,7 +97,7 @@ export const api = {
   },
 
   // Session Management (Admin)
-  async createSession(sessionData: any): Promise<{ success: boolean; session?: Session }> {
+  async createSession(sessionData: any): Promise<{ success: boolean; session?: Session; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -106,7 +106,7 @@ export const api = {
     return response.json();
   },
 
-  async updateSession(id: string, sessionData: any): Promise<{ success: boolean; session?: Session }> {
+  async updateSession(id: string, sessionData: any): Promise<{ success: boolean; session?: Session; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${id}/`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -115,15 +115,15 @@ export const api = {
     return response.json();
   },
 
-  async deleteSession(id: string): Promise<{ success: boolean }> {
+  async deleteSession(id: string): Promise<{ success: boolean; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${id}/`, {
       method: "DELETE",
       headers: getAuthHeaders(),
     });
-    return response.ok ? { success: true } : { success: false };
+    return response.ok ? { success: true } : { success: false, error: "Failed to delete session" };
   },
 
-  async startSession(id: string): Promise<{ success: boolean; session?: Session }> {
+  async startSession(id: string): Promise<{ success: boolean; session?: Session; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${id}/start_session/`, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -131,7 +131,7 @@ export const api = {
     return response.json();
   },
 
-  async endSession(id: string): Promise<{ success: boolean; session?: Session }> {
+  async endSession(id: string): Promise<{ success: boolean; session?: Session; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${id}/end_session/`, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -139,14 +139,14 @@ export const api = {
     return response.json();
   },
 
-  async getSessionParticipants(id: string): Promise<{ success: boolean; participants?: any[]; count?: number }> {
+  async getSessionParticipants(id: string): Promise<{ success: boolean; participants?: any[]; count?: number; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/${id}/participants/`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
-  async getSessionStats(): Promise<{ success: boolean; stats?: any }> {
+  async getSessionStats(): Promise<{ success: boolean; stats?: any; error?: string }> {
     const response = await fetch(`${API_BASE}/sessions/stats/`, {
       headers: getAuthHeaders(),
     });
