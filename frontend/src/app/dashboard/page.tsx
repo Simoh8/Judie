@@ -79,11 +79,16 @@ export default function Dashboard() {
       if (data.success) {
         // Update lead request status
         setLeadRequestStatuses(prev => ({ ...prev, [sessionId]: 'pending' }));
-        // Refresh user data and lead requests
-        await Promise.all([
+        // Refresh user data, lead requests, sessions, and booked sessions
+        const promises = [
           refreshUserData(),
           refreshLeadRequests(),
-        ]);
+          useSessionStore.getState().loadSessions(),
+        ];
+        if (user?.id) {
+          promises.push(loadUserBookedSessions(user.id));
+        }
+        await Promise.all(promises);
       } else {
         alert(data.error || 'Failed to request to lead');
       }
@@ -93,6 +98,19 @@ export default function Dashboard() {
     } finally {
       setLoadingSessionId(null);
     }
+  };
+
+  const handleSessionAction = async () => {
+    // Refresh all data when a session action occurs (join/cancel)
+    const promises = [
+      refreshUserData(),
+      refreshLeadRequests(),
+      useSessionStore.getState().loadSessions(),
+    ];
+    if (user?.id) {
+      promises.push(loadUserBookedSessions(user.id));
+    }
+    await Promise.all(promises);
   };
 
   return (
@@ -174,6 +192,7 @@ export default function Dashboard() {
                           setLoadingSessionId(null);
                         }
                       }}
+                      onSessionAction={handleSessionAction}
                     />
                   ))}
                 </div>

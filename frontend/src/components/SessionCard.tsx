@@ -18,6 +18,7 @@ interface SessionCardProps {
   leadRequestStatus?: string;
   loadingSessionId?: string | null;
   onLoadingChange?: (loading: boolean, sessionId: string) => void;
+  onSessionAction?: () => void;
 }
 
 export default function SessionCard({
@@ -31,6 +32,7 @@ export default function SessionCard({
   leadRequestStatus,
   loadingSessionId: externalLoadingId,
   onLoadingChange,
+  onSessionAction,
 }: SessionCardProps) {
   const { user } = useAuth();
   const { bookSession, cancelBooking } = useSessionStore();
@@ -70,6 +72,10 @@ export default function SessionCard({
       await refreshUserData();
       // Force a re-render by updating the session's isBooked property
       (session as any).isBooked = true;
+      // Call parent's session action handler to refresh dashboard data
+      if (onSessionAction) {
+        await onSessionAction();
+      }
     } catch (error) {
       console.error("Failed to join session:", error);
     } finally {
@@ -84,6 +90,10 @@ export default function SessionCard({
     try {
       await cancelBooking(session.id, user.id);
       await refreshUserData();
+      // Call parent's session action handler to refresh dashboard data
+      if (onSessionAction) {
+        await onSessionAction();
+      }
     } catch (error) {
       console.error("Failed to cancel booking:", error);
     } finally {

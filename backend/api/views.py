@@ -473,6 +473,10 @@ class SessionViewSet(viewsets.ModelViewSet):
         # Reuse cancelled booking if exists, otherwise create new
         booking = Booking.objects.filter(session=session, user=user).first()
         if booking:
+            # Only increment sessions_joined if reactivating a cancelled booking
+            if booking.status != 'confirmed':
+                user.sessions_joined += 1
+                user.save()
             booking.status = 'confirmed'
             booking.save()
         else:

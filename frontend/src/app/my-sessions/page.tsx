@@ -126,6 +126,8 @@ export default function MySessions() {
           ...prev,
           [sessionId]: 'pending'
         }));
+        // Refresh user data to keep stats updated
+        await refreshUserData();
       }
     } catch (error) {
       console.error("Failed to request to lead:", error);
@@ -160,6 +162,7 @@ export default function MySessions() {
                     showReviewButton={true}
                     onReview={openReviewModal}
                     onRequestToLead={handleRequestToLead}
+                    onSessionAction={refreshUserData}
                     leadRequestStatus={leadRequestStatuses[session.id]}
                     loadingSessionId={loadingLeadRequest}
                     onLoadingChange={(loading, sessionId) => {
