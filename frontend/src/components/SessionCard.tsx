@@ -39,7 +39,7 @@ export default function SessionCard({
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
 
   const isLoading = externalLoadingId === session.id || internalLoading;
-  const isBooked = (session as any).isBooked || false;
+  const isBooked = session.isBooked ?? false;
 
   const setLoading = (loading: boolean) => {
     setInternalLoading(loading);
@@ -68,6 +68,8 @@ export default function SessionCard({
     try {
       await bookSession(session.id, user.id);
       await refreshUserData();
+      // Force a re-render by updating the session's isBooked property
+      (session as any).isBooked = true;
     } catch (error) {
       console.error("Failed to join session:", error);
     } finally {

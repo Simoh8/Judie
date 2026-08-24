@@ -7,11 +7,12 @@ import { useUserStore } from "@/stores/userStore";
 import { Session } from "@/lib/types";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
-import { Calendar, Clock, Users, TrendingUp, Star, Crown } from "lucide-react";
+import SessionCard from "@/components/SessionCard";
+import { Clock, Users, Calendar, TrendingUp } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { sessions, loading } = useSessionStore();
+  const { sessions, loading, loadUserBookedSessions } = useSessionStore();
   const { updateUser } = useUserStore();
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
@@ -19,7 +20,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     useSessionStore.getState().loadSessions();
-  }, []);
+    if (user?.id) {
+      loadUserBookedSessions(user.id);
+    }
+  }, [user?.id, loadUserBookedSessions]);
 
   useEffect(() => {
     setUpcomingSessions(sessions.slice(0, 3));
@@ -60,59 +64,6 @@ export default function Dashboard() {
     refreshLeadRequests();
   }, [refreshUserData, refreshLeadRequests]);
 
-  const formatTime = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  };
-
-  const formatDate = (date: Date | string) => {
-    const d = new Date(date);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (d.toDateString() === today.toDateString()) return "Today";
-    if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const handleJoinSession = async (sessionId: string) => {
-    if (!user?.id || loadingSessionId) return;
-
-    setLoadingSessionId(sessionId);
-    try {
-      // Use session store for consistency
-      await useSessionStore.getState().bookSession(sessionId, user.id);
-      
-      // Refresh user data and lead requests
-      await Promise.all([
-        refreshUserData(),
-        refreshLeadRequests(),
-      ]);
-    } catch (error) {
-      console.error("Failed to join session:", error);
-    } finally {
-      setLoadingSessionId(null);
-    }
-  };
-
-  const handleCancelBooking = async (sessionId: string) => {
-    if (!user?.id || loadingSessionId) return;
-
-    setLoadingSessionId(sessionId);
-    try {
-      // Use session store for consistency
-      await useSessionStore.getState().cancelBooking(sessionId, user.id);
-      
-      // Refresh user data
-      await refreshUserData();
-    } catch (error) {
-      console.error("Failed to cancel booking:", error);
-    } finally {
-      setLoadingSessionId(null);
-    }
-  };
-
   const handleRequestToLead = async (sessionId: string) => {
     if (!user?.id || loadingSessionId) return;
 
@@ -128,6 +79,11 @@ export default function Dashboard() {
       if (data.success) {
         // Update lead request status
         setLeadRequestStatuses(prev => ({ ...prev, [sessionId]: 'pending' }));
+        // Refresh user data and lead requests
+        await Promise.all([
+          refreshUserData(),
+          refreshLeadRequests(),
+        ]);
       } else {
         alert(data.error || 'Failed to request to lead');
       }
@@ -203,75 +159,22 @@ export default function Dashboard() {
               ) : upcomingSessions.length > 0 ? (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {upcomingSessions.map((session) => (
-                    <div key={session.id} className="card-ios p-6">
-                      <h3 className="text-lg font-semibold mb-2 text-foreground">{session.title}</h3>
-                      <div className="space-y-2 text-sm text-foreground/70">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={16} />
-                          <span>{formatDate(session.scheduledFor)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} />
-                          <span>{formatTime(session.scheduledFor)} • {session.duration} min</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users size={16} />
-                          <span>{session.currentParticipants}/{session.maxParticipants} joined</span>
-                        </div>
-                        {session.averageRating && (
-                          <div className="flex items-center gap-2">
-                            <Star size={16} className="fill-yellow-400 text-yellow-400" />
-                            <span>{session.averageRating.toFixed(1)} / 5</span>
-                          </div>
-                        )}
-                      </div>
-                      {(session as any).isBooked ? (
-                        <div className="space-y-2 mt-4">
-                          <button
-                            onClick={() => handleCancelBooking(session.id)}
-                            className="btn-ios btn-secondary text-sm w-full"
-                            disabled={loadingSessionId === session.id}
-                          >
-                            {loadingSessionId === session.id ? 'Cancelling...' : 'Cancel Session'}
-                          </button>
-                          {session.leader?.id === user?.id ? (
-                            <div className="flex items-center justify-center gap-2 text-green-600 text-sm font-medium">
-                              <Crown size={16} />
-                              <span>You are leading this session</span>
-                            </div>
-                          ) : leadRequestStatuses[String(session.id)] === 'pending' ? (
-                            <div className="text-center text-sm text-foreground/60">
-                              Request pending...
-                            </div>
-                          ) : leadRequestStatuses[String(session.id)] === 'approved' ? (
-                            <div className="flex items-center justify-center gap-2 text-green-600 text-sm font-medium">
-                              <Crown size={16} />
-                              <span>Request approved!</span>
-                            </div>
-                          ) : leadRequestStatuses[String(session.id)] === 'rejected' ? (
-                            <div className="text-center text-sm text-red-500">
-                              Request rejected
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleRequestToLead(session.id)}
-                              className="btn-ios btn-primary text-sm w-full"
-                              disabled={loadingSessionId === session.id}
-                            >
-                              {loadingSessionId === session.id ? 'Requesting...' : 'Request to Lead'}
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleJoinSession(session.id)}
-                          className="btn-ios btn-primary text-sm w-full mt-4"
-                          disabled={session.currentParticipants >= session.maxParticipants || loadingSessionId === session.id}
-                        >
-                          {loadingSessionId === session.id ? 'Joining...' : session.currentParticipants >= session.maxParticipants ? 'Session Full' : 'Join Session'}
-                        </button>
-                      )}
-                    </div>
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      showCancelButton={true}
+                      showZoomDetails={false}
+                      onRequestToLead={handleRequestToLead}
+                      leadRequestStatus={leadRequestStatuses[String(session.id)]}
+                      loadingSessionId={loadingSessionId}
+                      onLoadingChange={(loading, sessionId) => {
+                        if (loading) {
+                          setLoadingSessionId(sessionId);
+                        } else {
+                          setLoadingSessionId(null);
+                        }
+                      }}
+                    />
                   ))}
                 </div>
               ) : (

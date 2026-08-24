@@ -9,9 +9,11 @@ interface SessionStore {
   searchTerm: string;
   statusFilter: string;
   typeFilter: string;
+  bookedSessionIds: Set<string>;
   
   // Actions
   loadSessions: () => Promise<void>;
+  loadUserBookedSessions: (userId: string) => Promise<void>;
   createSession: (sessionData: any) => Promise<void>;
   updateSession: (id: string, sessionData: any) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
@@ -33,11 +35,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   searchTerm: '',
   statusFilter: '',
   typeFilter: '',
+  bookedSessionIds: new Set<string>(),
 
   loadSessions: async () => {
     set({ loading: true, error: null });
     try {
-      const { searchTerm, statusFilter, typeFilter } = get();
+      const { searchTerm, statusFilter, typeFilter, bookedSessionIds } = get();
       const params: any = {};
       if (searchTerm) params.search = searchTerm;
       if (statusFilter) params.status = statusFilter;
@@ -45,12 +48,31 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
       const response = await api.getSessions(params);
       if (response.success && response.sessions) {
-        set({ sessions: response.sessions, loading: false });
+        // Add isBooked property to each session based on bookedSessionIds
+        const sessionsWithBookingStatus = response.sessions.map((session: Session) => ({
+          ...session,
+          isBooked: bookedSessionIds.has(session.id)
+        }));
+        set({ sessions: sessionsWithBookingStatus, loading: false });
       } else {
         set({ error: 'Failed to load sessions', loading: false });
       }
     } catch (error) {
       set({ error: 'Failed to load sessions', loading: false });
+    }
+  },
+
+  loadUserBookedSessions: async (userId: string) => {
+    try {
+      const response = await api.getUserSessions(userId);
+      if (response.success && response.sessions) {
+        const bookedIds = new Set(response.sessions.map((s: Session) => s.id));
+        set({ bookedSessionIds: bookedIds });
+        // Reload sessions to update isBooked status
+        await get().loadSessions();
+      }
+    } catch (error) {
+      console.error('Failed to load user booked sessions:', error);
     }
   },
 
@@ -144,11 +166,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const response = await api.bookSession(id, userId);
       if (response.success) {
-        // Reload sessions to get updated participant count
+        // Add session to booked set
+        set((state) => ({
+          bookedSessionIds: new Set([...state.bookedSessionIds, id])
+        }));
+        // Reload sessions to get updated participant count and isBooked status
         await get().loadSessions();
         set({ loading: false });
       } else if (response.error === 'Already booked') {
-        // If already booked, just reload sessions to get current state
+        // If already booked, add to booked set and reload
+        set((state) => ({
+          bookedSessionIds: new Set([...state.bookedSessionIds, id])
+        }));
         await get().loadSessions();
         set({ loading: false });
       } else {
@@ -164,7 +193,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const response = await api.cancelBooking(id, userId);
       if (response.success) {
-        // Reload sessions to get updated participant count
+        // Remove session from booked set
+        set((state) => {
+          const newBookedIds = new Set(state.bookedSessionIds);
+          newBookedIds.delete(id);
+          return { bookedSessionIds: newBookedIds };
+        });
+        // Reload sessions to get updated participant count and isBooked status
         await get().loadSessions();
         set({ loading: false });
       } else {

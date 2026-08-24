@@ -28,7 +28,7 @@ const sessionTypeConfig = {
 };
 
 export default function SessionTypes() {
-  const { sessions, loading } = useSessionStore();
+  const { sessions, loading, loadUserBookedSessions } = useSessionStore();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [bookingSessionId, setBookingSessionId] = useState<string | null>(null);
   const { user } = useAuth();
@@ -36,7 +36,10 @@ export default function SessionTypes() {
 
   useEffect(() => {
     useSessionStore.getState().loadSessions();
-  }, []);
+    if (user?.id) {
+      loadUserBookedSessions(user.id);
+    }
+  }, [user?.id, loadUserBookedSessions]);
 
   const formatTime = (date: Date | string) => {
     const d = new Date(date);
@@ -145,7 +148,7 @@ export default function SessionTypes() {
                       {session.description}
                     </p>
 
-                    {(session as any).isBooked ? (
+                    {session.isBooked ?? false ? (
                       <button
                         disabled
                         className="btn-ios btn-secondary text-sm w-full opacity-50"

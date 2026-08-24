@@ -33,6 +33,7 @@ export interface Session {
     name?: string;
     email?: string;
   };
+  isBooked?: boolean;
 }
 
 export interface SessionBooking {

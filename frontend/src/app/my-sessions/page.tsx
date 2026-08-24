@@ -8,18 +8,19 @@ import { Session } from "@/lib/types";
 import { api } from "@/lib/api";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
+import SessionCard from "@/components/SessionCard";
 import ReviewModal from "@/components/ReviewModal";
-import { Calendar, Clock, Users, X, Star, Video, Copy, Check } from "lucide-react";
 
 export default function MySessions() {
   const { user } = useAuth();
   const { getUserSessions, updateUser } = useUserStore();
-  const { cancelBooking } = useSessionStore();
+  const { cancelBooking, loadUserBookedSessions } = useSessionStore();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
+  const [leadRequestStatuses, setLeadRequestStatuses] = useState<Record<string, string>>({});
+  const [loadingLeadRequest, setLoadingLeadRequest] = useState<string | null>(null);
 
   const refreshUserData = useCallback(async () => {
     if (!user?.id) return;
@@ -39,8 +40,30 @@ export default function MySessions() {
       if (!user?.id) return;
 
       try {
+        // Load user's booked sessions to update the session store
+        await loadUserBookedSessions(user.id);
         const userSessions = await getUserSessions();
-        setSessions(userSessions);
+        // Set isBooked to true for all user sessions since they are the user's booked sessions
+        const sessionsWithBookingStatus = userSessions.map((session: Session) => ({
+          ...session,
+          isBooked: true
+        }));
+        setSessions(sessionsWithBookingStatus);
+
+        // Fetch lead request statuses for each session
+        const statuses: Record<string, string> = {};
+        for (const session of sessionsWithBookingStatus) {
+          try {
+            const response = await fetch(`/api/lead-requests?user=${user.id}&session=${session.id}`);
+            const data = await response.json();
+            if (data.success && data.leadRequests && data.leadRequests.length > 0) {
+              statuses[session.id] = data.leadRequests[0].status;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch lead request for session ${session.id}:`, error);
+          }
+        }
+        setLeadRequestStatuses(statuses);
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
       } finally {
@@ -49,39 +72,7 @@ export default function MySessions() {
     }
 
     fetchSessions();
-  }, [user?.id, getUserSessions]);
-
-  const formatTime = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  };
-
-  const formatDate = (date: Date | string) => {
-    const d = new Date(date);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (d.toDateString() === today.toDateString()) return "Today";
-    if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const handleCancelBooking = async (sessionId: string) => {
-    if (!user?.id) return;
-    
-    try {
-      // Use session store for consistency
-      await cancelBooking(sessionId, user.id);
-      
-      // Refresh user data and sessions
-      await refreshUserData();
-      const userSessions = await getUserSessions();
-      setSessions(userSessions);
-    } catch (error) {
-      console.error("Failed to cancel booking:", error);
-    }
-  };
+  }, [user?.id, getUserSessions, loadUserBookedSessions]);
 
   const handleReview = async (rating: number, comment: string) => {
     if (!user?.id || !selectedSession) return;
@@ -114,10 +105,33 @@ export default function MySessions() {
     setReviewModalOpen(true);
   };
 
-  const copyToClipboard = (text: string, meetingId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedMeetingId(meetingId);
-    setTimeout(() => setCopiedMeetingId(null), 2000);
+  const handleRequestToLead = async (sessionId: string) => {
+    if (!user?.id) return;
+
+    setLoadingLeadRequest(sessionId);
+    try {
+      const response = await fetch('/api/lead-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session: sessionId,
+          user: user.id,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update the lead request status for this session
+        setLeadRequestStatuses(prev => ({
+          ...prev,
+          [sessionId]: 'pending'
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to request to lead:", error);
+    } finally {
+      setLoadingLeadRequest(null);
+    }
   };
 
   return (
@@ -138,94 +152,24 @@ export default function MySessions() {
             ) : sessions.length > 0 ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
                 {sessions.map((session) => (
-                  <div key={session.id} className="card-ios p-6 relative">
-                    {session.status === 'scheduled' && (
-                      <button
-                        onClick={() => handleCancelBooking(session.id)}
-                        className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-ios-gray-800 transition-colors"
-                      >
-                        <X size={18} className="text-foreground/60" />
-                      </button>
-                    )}
-                    <h3 className="text-lg font-semibold mb-2 text-foreground pr-8">{session.title}</h3>
-                    <div className="space-y-2 text-sm text-foreground/70">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={16} />
-                        <span>{formatDate(session.scheduledFor)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock size={16} />
-                        <span>{formatTime(session.scheduledFor)} • {session.duration} min</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users size={16} />
-                        <span>{session.currentParticipants}/{session.maxParticipants} joined</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          session.status === 'completed' 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                            : session.status === 'live'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
-                        }`}>
-                          {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                        </span>
-                      </div>
-                    </div>
-                    {session.zoomJoinUrl && (
-                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
-                          <Video size={16} />
-                          <span>Zoom Meeting</span>
-                        </div>
-                        <div className="space-y-1 text-xs text-foreground/70">
-                          <div className="flex items-center justify-between">
-                            <span>Meeting ID: {session.zoomMeetingId}</span>
-                            <button
-                              onClick={() => copyToClipboard(session.zoomMeetingId || '', session.zoomMeetingId || '')}
-                              className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
-                            >
-                              {copiedMeetingId === session.zoomMeetingId ? (
-                                <Check size={14} className="text-green-600" />
-                              ) : (
-                                <Copy size={14} />
-                              )}
-                            </button>
-                          </div>
-                          <div>Password: {session.zoomPassword}</div>
-                          <a
-                            href={session.zoomJoinUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                          >
-                            Join Meeting →
-                          </a>
-                        </div>
-                      </div>
-                    )}
-                    {session.status === 'completed' ? (
-                      <button
-                        onClick={() => openReviewModal(session)}
-                        className="btn-ios btn-primary text-sm w-full mt-4 flex items-center justify-center gap-2"
-                      >
-                        <Star size={16} />
-                        Review Session
-                      </button>
-                    ) : session.status === 'scheduled' ? (
-                      <button
-                        onClick={() => handleCancelBooking(session.id)}
-                        className="btn-ios btn-secondary text-sm w-full mt-4"
-                      >
-                        Cancel Session
-                      </button>
-                    ) : (
-                      <button className="btn-ios btn-primary text-sm w-full mt-4">
-                        Join Now
-                      </button>
-                    )}
-                  </div>
+                  <SessionCard
+                    key={session.id}
+                    session={session}
+                    showCancelButton={true}
+                    showZoomDetails={true}
+                    showReviewButton={true}
+                    onReview={openReviewModal}
+                    onRequestToLead={handleRequestToLead}
+                    leadRequestStatus={leadRequestStatuses[session.id]}
+                    loadingSessionId={loadingLeadRequest}
+                    onLoadingChange={(loading, sessionId) => {
+                      if (loading) {
+                        setLoadingLeadRequest(sessionId);
+                      } else {
+                        setLoadingLeadRequest(null);
+                      }
+                    }}
+                  />
                 ))}
               </div>
             ) : (
