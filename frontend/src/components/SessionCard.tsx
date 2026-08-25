@@ -125,7 +125,7 @@ export default function SessionCard({
   };
 
   const extendedSession = session as ExtendedSession;
-  const isOngoingSession = session.type === 'ongoing' || extendedSession.isOngoing;
+  const isOngoingSession = (session.type as string) === 'ongoing' || extendedSession.isOngoing;
 
   const copyToClipboard = (text: string, meetingId: string) => {
     navigator.clipboard.writeText(text);
