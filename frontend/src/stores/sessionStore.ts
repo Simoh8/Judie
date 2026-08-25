@@ -190,17 +190,21 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const response = await api.bookSession(id, userId);
       if (response.success) {
         // Add session to booked set
-        set((state) => ({
-          bookedSessionIds: new Set([...state.bookedSessionIds, id])
-        }));
+        set((state) => {
+          const newBookedIds = new Set(state.bookedSessionIds);
+          newBookedIds.add(id);
+          return { bookedSessionIds: newBookedIds };
+        });
         // Reload sessions to get updated participant count and isBooked status
         await get().loadSessions();
         set({ loading: false });
       } else if (response.error === 'Already booked') {
         // If already booked, add to booked set and reload
-        set((state) => ({
-          bookedSessionIds: new Set([...state.bookedSessionIds, id])
-        }));
+        set((state) => {
+          const newBookedIds = new Set(state.bookedSessionIds);
+          newBookedIds.add(id);
+          return { bookedSessionIds: newBookedIds };
+        });
         await get().loadSessions();
         set({ loading: false });
       } else {
