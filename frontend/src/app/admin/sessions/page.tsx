@@ -8,7 +8,14 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import SessionForm from "@/components/SessionForm";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Plus, Search, Filter, Play, Square, Users, Calendar, Clock, Trash2, Edit, Eye } from "lucide-react";
+import { Plus, Search, Filter, Play, Square, Users, Calendar, Clock, Trash2, Edit, Eye, Video, RefreshCw, RotateCcw, X } from "lucide-react";
+
+// Extend Session type with ongoing session properties
+interface ExtendedSession extends Session {
+  isOngoing?: boolean;
+  lastRegeneratedAt?: string | null;
+  regenerateIntervalHours?: number;
+}
 
 export default function AdminSessionsPage() {
   const { user } = useAuth();
@@ -26,14 +33,15 @@ export default function AdminSessionsPage() {
     deleteSession,
     startSession,
     endSession,
+    regenerateZoom,
     getParticipants,
     getStats,
   } = useSessionStore();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editingSession, setEditingSession] = useState<ExtendedSession | null>(null);
   const [stats, setStats] = useState<any>(null);
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [selectedSession, setSelectedSession] = useState<ExtendedSession | null>(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
 
@@ -99,7 +107,15 @@ export default function AdminSessionsPage() {
     }
   };
 
-  const handleViewParticipants = async (session: Session) => {
+  const handleRegenerateZoom = async (sessionId: string) => {
+    try {
+      await regenerateZoom(sessionId);
+    } catch (error) {
+      console.error("Regenerate Zoom error:", error);
+    }
+  };
+
+  const handleViewParticipants = async (session: ExtendedSession) => {
     try {
       const participantsData = await getParticipants(session.id.toString());
       setParticipants(participantsData);
@@ -124,6 +140,7 @@ export default function AdminSessionsPage() {
       case "sprint": return "Focus Sprint";
       case "deep-work": return "Deep Work";
       case "marathon": return "Marathon";
+      case "ongoing": return "Ongoing Call";
       default: return type;
     }
   };
@@ -236,6 +253,7 @@ export default function AdminSessionsPage() {
                   <option value="sprint">Focus Sprint</option>
                   <option value="deep-work">Deep Work</option>
                   <option value="marathon">Marathon</option>
+                  <option value="ongoing">Ongoing Call</option>
                 </select>
               </div>
             </div>
@@ -249,55 +267,79 @@ export default function AdminSessionsPage() {
               <div className="p-8 text-center text-foreground/60">No sessions found</div>
             ) : (
               <div className="divide-y divide-ios-gray-200 dark:divide-ios-gray-700">
-                {sessions.map((session) => (
+                {sessions.map((session) => {
+                  const extendedSession = session as ExtendedSession;
+                  return (
                   <div key={session.id} className="p-6 hover:bg-gray-50 dark:hover:bg-ios-gray-700 transition-colors">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-foreground">{session.title}</h3>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(session.status)}`}>
-                            {session.status}
+                          <h3 className="text-lg font-semibold text-foreground">{extendedSession.title}</h3>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(extendedSession.status)}`}>
+                            {extendedSession.status}
                           </span>
                           <span className="px-3 py-1 rounded-full text-xs font-medium bg-ios-gray-100 text-ios-gray-700 dark:bg-ios-gray-700 dark:text-ios-gray-300">
-                            {getTypeLabel(session.type)}
+                            {getTypeLabel(extendedSession.type)}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-4 text-sm text-foreground/60">
-                          <div className="flex items-center gap-2">
-                            <Calendar size={16} />
-                            {formatDate(session.scheduledFor)}
-                          </div>
+                          {extendedSession.isOngoing ? (
+                            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                              <Video size={16} />
+                              <span className="font-medium">Always Available</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Calendar size={16} />
+                              {formatDate(extendedSession.scheduledFor)}
+                            </div>
+                          )}
                           <div className="flex items-center gap-2">
                             <Clock size={16} />
-                            {session.duration} minutes
+                            {extendedSession.duration} minutes
                           </div>
                           <div className="flex items-center gap-2">
                             <Users size={16} />
-                            {session.currentParticipants}/{session.maxParticipants}
+                            {extendedSession.currentParticipants}/{extendedSession.maxParticipants}
                           </div>
-                          <div>Facilitator: {session.facilitator}</div>
+                          <div>Facilitator: {extendedSession.facilitator}</div>
+                          {extendedSession.isOngoing && extendedSession.lastRegeneratedAt && (
+                            <div className="flex items-center gap-2 text-xs text-foreground/60">
+                              <RefreshCw size={12} />
+                              <span>Last regenerated: {formatDate(extendedSession.lastRegeneratedAt)}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleViewParticipants(session)}
+                          onClick={() => handleViewParticipants(extendedSession)}
                           className="p-2 rounded-lg hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
                           title="View Participants"
                         >
                           <Eye size={18} className="text-foreground/60" />
                         </button>
-                        {session.status === "scheduled" && (
+                        {extendedSession.isOngoing && (
                           <button
-                            onClick={() => handleStartSession(session.id.toString())}
+                            onClick={() => handleRegenerateZoom(extendedSession.id.toString())}
+                            className="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+                            title="Regenerate Zoom Meeting"
+                          >
+                            <RotateCcw size={18} className="text-blue-600" />
+                          </button>
+                        )}
+                        {extendedSession.status === "scheduled" && (
+                          <button
+                            onClick={() => handleStartSession(extendedSession.id.toString())}
                             className="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
                             title="Start Session"
                           >
                             <Play size={18} className="text-green-600" />
                           </button>
                         )}
-                        {session.status === "live" && (
+                        {extendedSession.status === "live" && (
                           <button
-                            onClick={() => handleEndSession(session.id.toString())}
+                            onClick={() => handleEndSession(extendedSession.id.toString())}
                             className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
                             title="End Session"
                           >
@@ -306,7 +348,7 @@ export default function AdminSessionsPage() {
                         )}
                         <button
                           onClick={() => {
-                            setEditingSession(session);
+                            setEditingSession(extendedSession);
                             setIsFormOpen(true);
                           }}
                           className="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
@@ -315,7 +357,7 @@ export default function AdminSessionsPage() {
                           <Edit size={18} className="text-blue-600" />
                         </button>
                         <button
-                          onClick={() => handleDeleteSession(session.id.toString())}
+                          onClick={() => handleDeleteSession(extendedSession.id.toString())}
                           className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
                           title="Delete Session"
                         >
@@ -324,7 +366,8 @@ export default function AdminSessionsPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             )}
           </div>
@@ -338,7 +381,7 @@ export default function AdminSessionsPage() {
                   onClick={() => setShowParticipants(false)}
                   className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-ios-gray-800 transition-colors"
                 >
-                  <Trash2 size={20} />
+                  <X size={20} />
                 </button>
                 <h2 className="text-2xl font-bold mb-6 text-foreground">
                   Participants - {selectedSession.title}

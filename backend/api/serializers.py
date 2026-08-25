@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils import timezone
 from .models import User, Session, Booking, Review, LeadRequest
 
 
@@ -17,7 +18,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SessionSerializer(serializers.ModelSerializer):
-    scheduledFor = serializers.DateTimeField(source='scheduled_for')
+    scheduledFor = serializers.DateTimeField(source='scheduled_for', required=False)
     maxParticipants = serializers.IntegerField(source='max_participants')
     currentParticipants = serializers.IntegerField(source='current_participants', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
@@ -28,14 +29,17 @@ class SessionSerializer(serializers.ModelSerializer):
     zoomStartUrl = serializers.URLField(source='zoom_start_url', read_only=True)
     zoomPassword = serializers.CharField(source='zoom_password', read_only=True)
     isBooked = serializers.SerializerMethodField()
+    isOngoing = serializers.BooleanField(source='is_ongoing')
+    regenerateIntervalHours = serializers.IntegerField(source='regenerate_interval_hours')
+    lastRegeneratedAt = serializers.DateTimeField(source='last_regenerated_at', read_only=True)
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'type', 'duration', 'scheduledFor', 'facilitator',
                   'maxParticipants', 'currentParticipants', 'status', 'description', 'createdAt', 'averageRating', 'leader',
-                  'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword', 'isBooked']
+                  'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword', 'isBooked', 'isOngoing', 'regenerateIntervalHours', 'lastRegeneratedAt']
         read_only_fields = ['id', 'currentParticipants', 'createdAt', 'averageRating', 'leader',
-                           'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword', 'isBooked']
+                           'zoomMeetingId', 'zoomJoinUrl', 'zoomStartUrl', 'zoomPassword', 'isBooked', 'lastRegeneratedAt']
 
     def get_averageRating(self, obj):
         reviews = obj.reviews.all()
@@ -48,6 +52,17 @@ class SessionSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             return obj.bookings.filter(user=request.user, status='confirmed').exists()
         return False
+
+    def validate(self, attrs):
+        # For ongoing sessions, set status to live automatically
+        if 'is_ongoing' in attrs and attrs['is_ongoing']:
+            attrs['status'] = 'live'
+            # Set scheduled_for to now if not provided
+            if not attrs.get('scheduled_for'):
+                attrs['scheduled_for'] = timezone.now()
+        return attrs
+
+
 
 
 class BookingSerializer(serializers.ModelSerializer):

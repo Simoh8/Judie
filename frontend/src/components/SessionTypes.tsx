@@ -25,6 +25,11 @@ const sessionTypeConfig = {
     color: "from-orange-500 to-red-500",
     label: "Marathon",
   },
+  ongoing: {
+    icon: Users,
+    color: "from-green-500 to-emerald-500",
+    label: "Ongoing Call",
+  },
 };
 
 export default function SessionTypes() {
@@ -105,7 +110,7 @@ export default function SessionTypes() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {sessions.map((session, index) => {
-              const config = sessionTypeConfig[session.type];
+              const config = sessionTypeConfig[session.type] || sessionTypeConfig.sprint;
               const Icon = config.icon;
               const isBooking = bookingSessionId === session.id;
 

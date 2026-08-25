@@ -413,6 +413,11 @@ class SessionViewSet(viewsets.ModelViewSet):
         # Create the session first
         session = serializer.save()
         
+        # For ongoing sessions, set scheduled time to now if not provided
+        if session.is_ongoing and not session.scheduled_for:
+            session.scheduled_for = timezone.now()
+            session.save()
+        
         # Generate Zoom meeting
         zoom_meeting = ZoomService.create_meeting(
             topic=session.title,
@@ -425,6 +430,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             session.zoom_join_url = zoom_meeting['join_url']
             session.zoom_start_url = zoom_meeting['start_url']
             session.zoom_password = zoom_meeting['password']
+            session.last_regenerated_at = timezone.now()  # Set initial regeneration time
             session.save()
         
         return Response({'success': True, 'session': SessionSerializer(session).data}, status=status.HTTP_201_CREATED)
@@ -777,6 +783,51 @@ See you there!
 
         serializer = self.get_serializer(session)
         return Response({'success': True, 'session': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    @permission_classes([permissions.IsAdminUser])
+    def regenerate_zoom(self, request, pk=None):
+        """Admin action to manually regenerate Zoom meeting for ongoing sessions"""
+        session = self.get_object()
+        
+        if not session.is_ongoing:
+            return Response(
+                {'success': False, 'error': 'This is not an ongoing session'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Delete old Zoom meeting if exists
+            if session.zoom_meeting_id:
+                ZoomService.delete_meeting(session.zoom_meeting_id)
+            
+            # Create new Zoom meeting
+            new_meeting = ZoomService.create_meeting(
+                topic=session.title,
+                start_time=timezone.now() + timedelta(minutes=5),
+                duration_minutes=session.duration
+            )
+            
+            if new_meeting:
+                session.zoom_meeting_id = new_meeting['meeting_id']
+                session.zoom_join_url = new_meeting['join_url']
+                session.zoom_start_url = new_meeting['start_url']
+                session.zoom_password = new_meeting['password']
+                session.last_regenerated_at = timezone.now()
+                session.save()
+                
+                serializer = self.get_serializer(session)
+                return Response({'success': True, 'session': serializer.data})
+            else:
+                return Response(
+                    {'success': False, 'error': 'Failed to create new Zoom meeting'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        except Exception as e:
+            return Response(
+                {'success': False, 'error': f'Error regenerating session: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['get'])
     @permission_classes([permissions.IsAdminUser])

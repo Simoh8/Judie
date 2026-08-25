@@ -7,13 +7,20 @@ import { useUserStore } from "@/stores/userStore";
 import { Session } from "@/lib/types";
 import { Calendar, Clock, Users, X, Star, Video, Copy, Check, Crown } from "lucide-react";
 
+// Extend Session type with ongoing session properties
+interface ExtendedSession extends Session {
+  isOngoing?: boolean;
+  lastRegeneratedAt?: string | null;
+  regenerateIntervalHours?: number;
+}
+
 interface SessionCardProps {
-  session: Session;
+  session: ExtendedSession;
   showCancelButton?: boolean;
   showZoomDetails?: boolean;
   showReviewButton?: boolean;
   showCancelInCard?: boolean;
-  onReview?: (session: Session) => void;
+  onReview?: (session: ExtendedSession) => void;
   onRequestToLead?: (sessionId: string) => void;
   leadRequestStatus?: string;
   loadingSessionId?: string | null;
@@ -117,6 +124,9 @@ export default function SessionCard({
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
+  const extendedSession = session as ExtendedSession;
+  const isOngoingSession = session.type === 'ongoing' || extendedSession.isOngoing;
+
   const copyToClipboard = (text: string, meetingId: string) => {
     navigator.clipboard.writeText(text);
     setCopiedMeetingId(meetingId);
@@ -148,14 +158,23 @@ export default function SessionCard({
       <h3 className="text-lg font-semibold mb-2 text-foreground pr-8">{session.title}</h3>
       
       <div className="space-y-2 text-sm text-foreground/70">
-        <div className="flex items-center gap-2">
-          <Calendar size={16} />
-          <span>{formatDate(session.scheduledFor)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock size={16} />
-          <span>{formatTime(session.scheduledFor)} • {session.duration} min</span>
-        </div>
+        {isOngoingSession ? (
+          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+            <Video size={16} />
+            <span className="font-medium">Always Available</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <Calendar size={16} />
+              <span>{formatDate(session.scheduledFor)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock size={16} />
+              <span>{formatTime(session.scheduledFor)} • {session.duration} min</span>
+            </div>
+          </>
+        )}
         <div className="flex items-center gap-2">
           <Users size={16} />
           <span>{session.currentParticipants}/{session.maxParticipants} joined</span>
@@ -171,6 +190,12 @@ export default function SessionCard({
             {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
           </span>
         </div>
+        {isOngoingSession && extendedSession.regenerateIntervalHours && (
+          <div className="flex items-center gap-2 text-xs text-foreground/60">
+            <Clock size={12} />
+            <span>Regenerates every {extendedSession.regenerateIntervalHours}h</span>
+          </div>
+        )}
       </div>
 
       {showZoomDetails && session.zoomJoinUrl && (

@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
     'api',
+    'django_crontab',
 ]
 
 MIDDLEWARE = [
@@ -228,3 +229,8 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@flown.com')
+
+# Crontab settings for ongoing session regeneration
+CRONJOBS = [
+    ('0 * * * *', 'django.core.management.call_command', ['regenerate_ongoing_sessions'], {}, '>> /tmp/ongoing_sessions_cron.log'),
+]

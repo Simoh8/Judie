@@ -19,6 +19,7 @@ interface SessionStore {
   deleteSession: (id: string) => Promise<void>;
   startSession: (id: string) => Promise<void>;
   endSession: (id: string) => Promise<void>;
+  regenerateZoom: (id: string) => Promise<void>;
   bookSession: (id: string, userId: string) => Promise<void>;
   cancelBooking: (id: string, userId: string) => Promise<void>;
   setSearchTerm: (term: string) => void;
@@ -158,6 +159,28 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     } catch (error) {
       set({ error: 'Failed to end session', loading: false });
+    }
+  },
+
+  regenerateZoom: async (id: string) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetch(`/api/sessions/${id}/regenerate-zoom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      
+      if (data.success && data.session) {
+        set((state) => ({
+          sessions: state.sessions.map((s) => s.id === id ? data.session : s),
+          loading: false
+        }));
+      } else {
+        set({ error: data.error || 'Failed to regenerate Zoom meeting', loading: false });
+      }
+    } catch (error) {
+      set({ error: 'Failed to regenerate Zoom meeting', loading: false });
     }
   },
 

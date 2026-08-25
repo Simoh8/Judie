@@ -46,6 +46,7 @@ class Session(models.Model):
         ('sprint', 'Focus Sprint'),
         ('deep-work', 'Deep Work'),
         ('marathon', 'Marathon'),
+        ('ongoing', 'Ongoing Call'),
     ]
 
     STATUS_CHOICES = [
@@ -71,6 +72,11 @@ class Session(models.Model):
     zoom_join_url = models.URLField(blank=True, max_length=500, null=True)
     zoom_start_url = models.URLField(blank=True, max_length=500, null=True)
     zoom_password = models.CharField(max_length=50, blank=True, null=True)
+    
+    # Ongoing session fields
+    is_ongoing = models.BooleanField(default=False)
+    regenerate_interval_hours = models.IntegerField(default=5)
+    last_regenerated_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.title

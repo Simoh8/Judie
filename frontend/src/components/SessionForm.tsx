@@ -1,16 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { X, Calendar, Clock, Users } from "lucide-react";
+import { X, Calendar, Clock, Users, Video } from "lucide-react";
+
+// Extend Session type with ongoing session properties
+interface ExtendedSession {
+  isOngoing?: boolean;
+  lastRegeneratedAt?: string | null;
+  regenerateIntervalHours?: number;
+}
 
 interface SessionFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (sessionData: any) => Promise<void>;
-  initialData?: any;
+  initialData?: ExtendedSession | any;
+  isOngoing?: boolean;
 }
 
-export default function SessionForm({ isOpen, onClose, onSubmit, initialData }: SessionFormProps) {
+export default function SessionForm({ isOpen, onClose, onSubmit, initialData, isOngoing = false }: SessionFormProps) {
   const [formData, setFormData] = useState({
     title: initialData?.title || "",
     type: initialData?.type || "sprint",
@@ -19,6 +27,8 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData }: 
     facilitator: initialData?.facilitator || "",
     maxParticipants: initialData?.maxParticipants || 10,
     description: initialData?.description || "",
+    isOngoing: (initialData as ExtendedSession)?.isOngoing || isOngoing || false,
+    regenerateIntervalHours: (initialData as ExtendedSession)?.regenerateIntervalHours || 5,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -31,7 +41,15 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData }: 
     setLoading(true);
 
     try {
-      await onSubmit(formData);
+      // For ongoing sessions, ensure isOngoing is set
+      const submitData = {
+        ...formData,
+        isOngoing: formData.type === 'ongoing' || isOngoing,
+        // Only include scheduledFor if it's not an ongoing session
+        scheduledFor: (formData.type === 'ongoing' || isOngoing) ? undefined : formData.scheduledFor,
+      };
+      
+      await onSubmit(submitData);
       onClose();
       setFormData({
         title: "",
@@ -41,6 +59,8 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData }: 
         facilitator: "",
         maxParticipants: 10,
         description: "",
+        isOngoing: isOngoing || false,
+        regenerateIntervalHours: 5,
       });
     } catch (err) {
       setError("Failed to save session");
@@ -90,6 +110,7 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData }: 
                 <option value="sprint">Focus Sprint</option>
                 <option value="deep-work">Deep Work</option>
                 <option value="marathon">Marathon</option>
+                <option value="ongoing">Ongoing Call</option>
               </select>
             </div>
 
@@ -110,6 +131,33 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData }: 
             </div>
           </div>
 
+          {(formData.type === 'ongoing' || isOngoing) && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl space-y-3">
+              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-medium">
+                <Video size={16} />
+                <span>Ongoing Call Settings</span>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-foreground">
+                  Regenerate Zoom Meeting Every (hours)
+                </label>
+                <input
+                  type="number"
+                  value={formData.regenerateIntervalHours}
+                  onChange={(e) => setFormData({ ...formData, regenerateIntervalHours: parseInt(e.target.value) })}
+                  className="w-full px-4 py-3 rounded-xl border border-ios-gray-200 dark:border-ios-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-ios-blue text-foreground"
+                  min="1"
+                  step="1"
+                  required
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  The Zoom meeting will be automatically regenerated after this interval
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2 text-foreground flex items-center gap-2">
@@ -121,8 +169,14 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData }: 
                 value={formData.scheduledFor}
                 onChange={(e) => setFormData({ ...formData, scheduledFor: e.target.value })}
                 className="w-full px-4 py-3 rounded-xl border border-ios-gray-200 dark:border-ios-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-ios-blue text-foreground"
-                required
+                required={formData.type !== 'ongoing' && !isOngoing}
+                disabled={formData.type === 'ongoing' || isOngoing}
               />
+              {(formData.type === 'ongoing' || isOngoing) && (
+                <p className="text-xs text-foreground/60 mt-1">
+                  Ongoing calls are always available
+                </p>
+              )}
             </div>
 
             <div>
