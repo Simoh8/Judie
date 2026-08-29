@@ -16,6 +16,7 @@ export default function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { user, logout, loading } = useAuth();
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const isLandingPage = pathname === "/";
 
@@ -53,6 +54,8 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+
+
   const navItems = [
     { name: "How it works", href: "/#how-it-works" },
     { name: "Sessions", href: "/#sessions" },
@@ -60,22 +63,22 @@ export default function Navbar() {
     { name: "About", href: "/about" },
   ];
 
-  const userNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "My Sessions", href: "/my-sessions", icon: CalendarDays },
+  const dropdownNavItems = [
     { name: "Profile", href: "/profile", icon: UserCircle },
   ];
 
-  const adminNavItems = [
-    { name: "Admin Sessions", href: "/admin/sessions", icon: ShieldCheck },
-    { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  ];
-
   const displayName = user?.firstName || user?.email?.split("@")[0] || "Account";
-  const activeItems = user?.isStaff ? adminNavItems : userNavItems;
 
   return (
     <>
+      {/* Mobile menu backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
           isScrolled ? "glass ios-shadow py-3" : "bg-transparent py-5"
@@ -96,8 +99,64 @@ export default function Navbar() {
                   <div className="w-24 h-9 bg-foreground/10 rounded-full" />
                 </div>
               ) : user ? (
-                /* ── User avatar + dropdown ── */
-                <div ref={userMenuRef} className="relative">
+                <>
+                  {/* ── User navigation links ── */}
+                  <div className="flex items-center gap-1">
+                    {user?.isStaff ? (
+                      <>
+                        <Link
+                          href="/admin/dashboard"
+                          className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-200 ${
+                            pathname === "/admin/dashboard"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
+                          }`}
+                        >
+                          <LayoutDashboard size={16} />
+                          <span className="hidden sm:inline">Dashboard</span>
+                        </Link>
+                        <Link
+                          href="/admin/sessions"
+                          className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-200 ${
+                            pathname === "/admin/sessions"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
+                          }`}
+                        >
+                          <ShieldCheck size={16} />
+                          <span className="hidden sm:inline">Admin Sessions</span>
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <Link
+                          href="/dashboard"
+                          className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-200 ${
+                            pathname === "/dashboard"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
+                          }`}
+                        >
+                          <LayoutDashboard size={16} />
+                          <span className="hidden sm:inline">Dashboard</span>
+                        </Link>
+                        <Link
+                          href="/my-sessions"
+                          className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-200 ${
+                            pathname === "/my-sessions"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
+                          }`}
+                        >
+                          <CalendarDays size={16} />
+                          <span className="hidden sm:inline">My Sessions</span>
+                        </Link>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ── User avatar + dropdown ── */}
+                  <div ref={userMenuRef} className="relative">
                   <button
                     onClick={() => setIsUserMenuOpen((v) => !v)}
                     className="flex items-center gap-2 px-3 py-2 rounded-2xl hover:bg-foreground/5 transition-colors duration-200 group"
@@ -125,7 +184,7 @@ export default function Navbar() {
                       {/* Header */}
                       <div className="px-4 py-2 border-b border-foreground/5 mb-1">
                         <p className="text-xs text-foreground/40 uppercase tracking-wider font-medium">
-                          {user.isStaff ? "Admin" : "My Account"}
+                          Account
                         </p>
                         <p className="text-sm font-semibold text-foreground truncate mt-0.5">
                           {user.email}
@@ -133,7 +192,7 @@ export default function Navbar() {
                       </div>
 
                       {/* Nav links */}
-                      {activeItems.map((item) => (
+                      {dropdownNavItems.map((item) => (
                         <Link
                           key={item.name}
                           href={item.href}
@@ -163,6 +222,7 @@ export default function Navbar() {
                     </div>
                   )}
                 </div>
+                </>
               ) : (
                 /* ── Guest links ── */
                 <>
@@ -197,12 +257,69 @@ export default function Navbar() {
 
           {/* Mobile drawer */}
           {isMobileMenuOpen && (
-            <div className="md:hidden mt-4 pb-4 animate-slide-down">
-              <div className="flex flex-col space-y-1">
+            <div ref={mobileMenuRef} className="md:hidden mt-4 pb-4 animate-slide-down bg-white dark:bg-ios-gray-900 rounded-2xl shadow-lg ios-shadow relative z-50">
+              <div className="flex flex-col space-y-1 p-2">
                 {user ? (
                   <>
+                    {/* User navigation links */}
+                    {user?.isStaff ? (
+                      <>
+                        <Link
+                          href="/admin/dashboard"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors duration-150 ${
+                            pathname === "/admin/dashboard"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                          }`}
+                        >
+                          <LayoutDashboard size={18} />
+                          Dashboard
+                        </Link>
+                        <Link
+                          href="/admin/sessions"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors duration-150 ${
+                            pathname === "/admin/sessions"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                          }`}
+                        >
+                          <ShieldCheck size={18} />
+                          Admin Sessions
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors duration-150 ${
+                            pathname === "/dashboard"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                          }`}
+                        >
+                          <LayoutDashboard size={18} />
+                          Dashboard
+                        </Link>
+                        <Link
+                          href="/my-sessions"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors duration-150 ${
+                            pathname === "/my-sessions"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                          }`}
+                        >
+                          <CalendarDays size={18} />
+                          My Sessions
+                        </Link>
+                      </>
+                    )}
+
                     {/* User header */}
-                    <div className="flex items-center gap-3 px-2 py-3 mb-2 border-b border-foreground/10">
+                    <div className="flex items-center gap-3 px-2 py-3 mb-2 border-b border-foreground/10 mt-2">
                       <div className="w-9 h-9 rounded-full bg-gradient-to-br from-ios-blue to-purple-500 flex items-center justify-center shadow-sm">
                         <span className="text-sm font-bold text-white uppercase">{displayName[0]}</span>
                       </div>
@@ -212,7 +329,7 @@ export default function Navbar() {
                       </div>
                     </div>
 
-                    {activeItems.map((item) => (
+                    {dropdownNavItems.map((item) => (
                       <Link
                         key={item.name}
                         href={item.href}
