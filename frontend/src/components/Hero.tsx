@@ -59,11 +59,11 @@ export default function Hero() {
               </>
             ) : (
               <>
-                <Link href="#signup" className="btn-ios btn-primary text-lg px-8 py-4 flex items-center gap-2">
+                <Link href="/pricing" className="btn-ios btn-primary text-lg px-8 py-4 flex items-center gap-2">
                   Start your free trial
                   <ArrowRight size={20} />
                 </Link>
-                <Link href="/demo" className="btn-ios btn-secondary text-lg px-8 py-4 flex items-center gap-2">
+                <Link href="/how-it-works" className="btn-ios btn-secondary text-lg px-8 py-4 flex items-center gap-2">
                   <Play size={20} className="fill-current" />
                   Watch demo
                 </Link>

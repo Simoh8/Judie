@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
-export default function PaymentCallbackPage() {
+function PaymentCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -142,5 +142,30 @@ export default function PaymentCallbackPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function PaymentCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white dark:bg-ios-gray-950">
+        <Navbar />
+        <main className="pt-24 pb-16 px-6">
+          <div className="max-w-2xl mx-auto">
+            <div className="card-ios ios-shadow-lg p-12 text-center">
+              <div className="flex justify-center mb-6">
+                <Loader2 className="animate-spin text-ios-blue" size={64} />
+              </div>
+              <h1 className="text-2xl font-bold text-foreground mb-4">
+                Loading...
+              </h1>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <PaymentCallbackContent />
+    </Suspense>
   );
 }

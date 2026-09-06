@@ -42,11 +42,11 @@ export default function CTA() {
                 </>
               ) : (
                 <>
-                  <Link href="#signup" className="btn-ios btn-primary text-lg px-8 py-4 flex items-center gap-2">
+                  <Link href="/pricing" className="btn-ios btn-primary text-lg px-8 py-4 flex items-center gap-2">
                     Start free trial
                     <ArrowRight size={20} />
                   </Link>
-                  <Link href="/#pricing" className="btn-ios btn-secondary text-lg px-8 py-4">
+                  <Link href="/pricing" className="btn-ios btn-secondary text-lg px-8 py-4">
                     View pricing
                   </Link>
                 </>
