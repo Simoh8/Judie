@@ -254,7 +254,7 @@ export default function PricingPage() {
                 </h3>
                 <p className="text-foreground/60">
                   Yes, you can upgrade or downgrade your package at any time. Changes take effect immediately, 
-                  and we'll handle the billing accordingly.
+                  and we&apos;ll handle the billing accordingly.
                 </p>
               </div>
               <div className="card-ios ios-shadow-lg p-6">
