@@ -84,10 +84,10 @@ export default function PrivacyPage() {
           <div className="card-ios ios-shadow-lg p-8 mb-12">
             <h2 className="text-2xl font-bold text-foreground mb-4">Our Commitment</h2>
             <p className="text-foreground/60 mb-4">
-              At FLOWN, we believe that privacy is a fundamental right. We are committed to protecting your personal information and being transparent about our data practices. This privacy policy applies to our website, mobile applications, and all services we provide.
+              At FOCUSED, we believe that privacy is a fundamental right. We are committed to protecting your personal information and being transparent about our data practices. This privacy policy applies to our website, mobile applications, and all services we provide.
             </p>
             <p className="text-foreground/60">
-              By using FLOWN, you agree to the collection and use of information in accordance with this policy. If you disagree with any part of this policy, please do not use our services.
+              By using FOCUSED, you agree to the collection and use of information in accordance with this policy. If you disagree with any part of this policy, please do not use our services.
             </p>
           </div>
 
@@ -147,10 +147,10 @@ export default function PrivacyPage() {
                   If you have any questions about this privacy policy or how we handle your personal information, please contact our privacy team.
                 </p>
                 <a
-                  href="mailto:privacy@flown.com"
+                  href="mailto:privacy@focused.com"
                   className="text-ios-blue hover:underline font-medium"
                 >
-                  privacy@flown.com
+                  privacy@focused.com
                 </a>
               </div>
             </div>

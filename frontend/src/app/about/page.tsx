@@ -27,7 +27,7 @@ const values = [
     icon: Heart,
     title: "Radical empathy",
     description:
-      "We built FLOWN for brains that struggle with traditional productivity advice — especially those with ADHD, anxiety, or executive function differences.",
+      "We built FOCUSED for brains that struggle with traditional productivity advice — especially those with ADHD, anxiety, or executive function differences.",
     color: "text-red-500",
     bg: "bg-red-50 dark:bg-red-900/20",
   },
@@ -53,21 +53,21 @@ const team = [
   {
     name: "Dr. Aliya Khatun",
     role: "Co-founder & Head of Science",
-    bio: "Cognitive neuroscientist with a decade of research into attention disorders. Built FLOWN after seeing how body doubling transformed her own ADHD patients.",
+    bio: "Cognitive neuroscientist with a decade of research into attention disorders. Built FOCUSED after seeing how body doubling transformed her own ADHD patients.",
     initials: "AK",
     gradient: "from-ios-blue to-purple-500",
   },
   {
     name: "Marcus Webb",
     role: "Co-founder & CEO",
-    bio: "Former remote team lead who struggled with distraction. Created the first FLOWN sessions in a Zoom call with 12 friends — and never looked back.",
+    bio: "Former remote team lead who struggled with distraction. Created the first FOCUSED sessions in a Zoom call with 12 friends — and never looked back.",
     initials: "MW",
     gradient: "from-ios-green to-teal-400",
   },
   {
     name: "Priya Sharma",
     role: "Head of Community",
-    bio: "Community builder and certified ADHD coach. Ensures every FLOWN session feels safe, inclusive, and genuinely productive for all kinds of minds.",
+    bio: "Community builder and certified ADHD coach. Ensures every FOCUSED session feels safe, inclusive, and genuinely productive for all kinds of minds.",
     initials: "PS",
     gradient: "from-ios-orange to-red-400",
   },
@@ -81,7 +81,7 @@ const team = [
 ];
 
 const milestones = [
-  { year: "2021", event: "FLOWN founded after a 12-person body-doubling experiment on Zoom." },
+  { year: "2021", event: "FOCUSED founded after a 12-person body-doubling experiment on Zoom." },
   { year: "2022", event: "Launched beta to 500 users. Waited lists opened within days." },
   { year: "2023", event: "Crossed 10,000 members and 500,000 focus hours completed." },
   { year: "2024", event: "Introduced expert-facilitated deep-work marathons and team plans." },
@@ -116,7 +116,7 @@ export default function AboutPage() {
             <span className="text-ios-blue">focused humans.</span>
           </h1>
           <p className="text-xl md:text-2xl text-foreground/70 max-w-3xl mx-auto leading-relaxed">
-            FLOWN was built for people who know they&apos;re capable of great
+            FOCUSED was built for people who know they&apos;re capable of great
             work — but keep getting in their own way. We exist to change that,
             one session at a time.
           </p>
@@ -152,7 +152,7 @@ export default function AboutPage() {
               <Quote size={48} className="text-ios-blue/30 mb-6" />
               <blockquote className="text-2xl md:text-3xl font-semibold text-foreground leading-relaxed mb-8">
                 &ldquo;The hardest part of any task isn&apos;t the work itself — it&apos;s
-                getting started and staying present. FLOWN exists to solve
+                getting started and staying present. FOCUSED exists to solve
                 exactly that.&rdquo;
               </blockquote>
               <div className="flex items-center gap-4">
@@ -305,7 +305,7 @@ export default function AboutPage() {
                 Join the community
               </h2>
               <p className="text-xl text-foreground/70 mb-10 max-w-2xl mx-auto leading-relaxed">
-                Thousands of people are already doing their best work with FLOWN.
+                Thousands of people are already doing their best work with FOCUSED.
                 Your spot is waiting.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

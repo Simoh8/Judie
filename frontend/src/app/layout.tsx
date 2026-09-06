@@ -3,12 +3,12 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "FLOWN | Body Doubling & Virtual Co-working for Focus",
+  title: "FOCUSED | Body Doubling & Virtual Co-working for Focus",
   description: "Get into flow and beat procrastination with online body doubling. Daily focus sessions with built-in accountability, expert facilitation and friendly community.",
   keywords: ["body doubling", "focus", "ADHD", "productivity", "virtual co-working", "flow state"],
-  authors: [{ name: "FLOWN" }],
+  authors: [{ name: "FOCUSED" }],
   openGraph: {
-    title: "FLOWN | Body Doubling & Virtual Co-working for Focus",
+    title: "FOCUSED | Body Doubling & Virtual Co-working for Focus",
     description: "Get into flow and beat procrastination with online body doubling.",
     type: "website",
   },

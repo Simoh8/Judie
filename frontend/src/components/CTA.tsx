@@ -21,7 +21,7 @@ export default function CTA() {
             <p className="text-xl text-foreground/70 mb-10 max-w-2xl mx-auto leading-relaxed">
               {!loading && user 
                 ? "Your next breakthrough is just one session away. Join your focus community and boost your productivity today."
-                : "Join thousands of people who have transformed their focus with FLOWN. Start your free trial today."}
+                : "Join thousands of people who have transformed their focus with FOCUSED. Start your free trial today."}
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 h-[60px]">

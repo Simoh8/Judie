@@ -36,7 +36,7 @@ export default function ContactPage() {
     {
       icon: Mail,
       title: "Email",
-      value: "support@flown.com",
+      value: "support@focused.com",
       description: "We'll respond within 24 hours",
     },
     {
@@ -56,7 +56,7 @@ export default function ContactPage() {
   const faqs = [
     {
       question: "What's the best way to reach support?",
-      answer: "For quick questions, try our live chat during business hours. For detailed inquiries, email us at support@flown.com.",
+      answer: "For quick questions, try our live chat during business hours. For detailed inquiries, email us at support@focused.com.",
     },
     {
       question: "Do you offer phone support?",

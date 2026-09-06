@@ -88,7 +88,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="text-2xl font-bold tracking-tight text-ios-blue">
-              FLOWN
+              FOCUSED
             </Link>
 
             {/* Desktop right section */}

@@ -16,8 +16,8 @@ export default function AdminDashboardPage() {
   const [leadRequests, setLeadRequests] = useState<any[]>([]);
   const [loadingLeadRequests, setLoadingLeadRequests] = useState(true);
 
-  // Temporary admin check - allow admin@flown.com regardless of isStaff field
-  const isAdmin = user?.isStaff || user?.email === 'admin@flown.com';
+  // Temporary admin check - allow admin@focused.com regardless of isStaff field
+  const isAdmin = user?.isStaff || user?.email === 'admin@focused.com';
 
   const loadStats = useCallback(async () => {
     try {

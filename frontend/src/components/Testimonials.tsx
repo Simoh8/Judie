@@ -20,14 +20,14 @@ const defaultTestimonials = [
   {
     name: "Sarah Chen",
     role: "Software Engineer",
-    content: "FLOWN has completely transformed how I work. The body doubling sessions keep me accountable without feeling pressured. I've never been more productive.",
+    content: "FOCUSED has completely transformed how I work. The body doubling sessions keep me accountable without feeling pressured. I've never been more productive.",
     rating: 5,
     avatar: "SC",
   },
   {
     name: "Marcus Johnson",
     role: "Writer & ADHD Coach",
-    content: "As someone with ADHD, I've tried every productivity tool out there. FLOWN is different - it actually works with my brain, not against it.",
+    content: "As someone with ADHD, I've tried every productivity tool out there. FOCUSED is different - it actually works with my brain, not against it.",
     rating: 5,
     avatar: "MJ",
   },

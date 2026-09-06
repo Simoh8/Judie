@@ -26,7 +26,7 @@ export default function PressPage() {
     },
     {
       title: "Product Screenshots",
-      description: "Professional screenshots of the FLOWN platform.",
+      description: "Professional screenshots of the FOCUSED platform.",
       size: "4.2 MB",
       format: "ZIP",
     },
@@ -41,7 +41,7 @@ export default function PressPage() {
   const pressCoverage = [
     {
       publication: "TechCrunch",
-      title: "FLOWN raises $10M to help remote teams focus",
+      title: "FOCUSED raises $10M to help remote teams focus",
       date: "2024-01-10",
       excerpt: "The platform uses science-backed methods to improve productivity for distributed teams.",
       link: "#",
@@ -50,14 +50,14 @@ export default function PressPage() {
       publication: "Forbes",
       title: "The Future of Remote Work: Deep Focus Sessions",
       date: "2023-12-15",
-      excerpt: "How FLOWN is pioneering a new approach to productivity in the remote work era.",
+      excerpt: "How FOCUSED is pioneering a new approach to productivity in the remote work era.",
       link: "#",
     },
     {
       publication: "Wired",
       title: "Can Group Focus Sessions Fix Remote Work Burnout?",
       date: "2023-11-20",
-      excerpt: "An in-depth look at the science behind FLOWN's approach to sustainable productivity.",
+      excerpt: "An in-depth look at the science behind FOCUSED's approach to sustainable productivity.",
       link: "#",
     },
   ];
@@ -97,7 +97,7 @@ export default function PressPage() {
               Press & Media
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
-              Latest news, resources, and information about FLOWN for journalists and media professionals.
+              Latest news, resources, and information about FOCUSED for journalists and media professionals.
             </p>
             <p className="text-sm text-foreground/40 mt-4">
               Last updated: {currentDate}
@@ -190,11 +190,11 @@ export default function PressPage() {
                 For press inquiries, interview requests, or media partnerships, please reach out to our press team.
               </p>
               <a
-                href="mailto:press@flown.com"
+                href="mailto:press@focused.com"
                 className="btn-ios btn-primary inline-flex items-center gap-2 text-lg"
               >
                 <Mail size={20} />
-                press@flown.com
+                press@focused.com
               </a>
             </div>
           </div>

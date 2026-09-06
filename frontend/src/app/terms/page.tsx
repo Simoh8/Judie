@@ -16,7 +16,7 @@ export default function TermsPage() {
       icon: CheckCircle,
       title: "Acceptance of Terms",
       content: [
-        "By accessing and using FLOWN, you accept and agree to be bound by these Terms of Service",
+        "By accessing and using FOCUSED, you accept and agree to be bound by these Terms of Service",
         "If you do not agree to these terms, please do not use our services",
         "We reserve the right to modify these terms at any time",
         "Continued use of the service constitutes acceptance of modified terms",
@@ -37,10 +37,10 @@ export default function TermsPage() {
       icon: FileText,
       title: "Service Description",
       content: [
-        "FLOWN provides focus sessions and productivity tools",
+        "FOCUSED provides focus sessions and productivity tools",
         "We strive to maintain service availability but cannot guarantee uninterrupted access",
         "We may update or discontinue features with or without notice",
-        "Third-party services integrated into FLOWN have their own terms",
+        "Third-party services integrated into FOCUSED have their own terms",
         "Session recordings and content may be stored for quality improvement",
       ],
     },
@@ -59,7 +59,7 @@ export default function TermsPage() {
       icon: Scale,
       title: "Intellectual Property",
       content: [
-        "All content, features, and functionality are owned by FLOWN",
+        "All content, features, and functionality are owned by FOCUSED",
         "You retain ownership of content you create during sessions",
         "You grant us a license to use your content for service improvement",
         "You may not reproduce, modify, or distribute our proprietary content",
@@ -83,7 +83,7 @@ export default function TermsPage() {
               Terms of Service
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
-              These terms govern your use of FLOWN services. Please read them carefully before using our platform.
+              These terms govern your use of FOCUSED services. Please read them carefully before using our platform.
             </p>
             <p className="text-sm text-foreground/40 mt-4">
               Last updated: {currentDate}
@@ -94,7 +94,7 @@ export default function TermsPage() {
           <div className="card-ios ios-shadow-lg p-8 mb-12">
             <h2 className="text-2xl font-bold text-foreground mb-4">Agreement to Terms</h2>
             <p className="text-foreground/60 mb-4">
-              These Terms of Service (&quot;Terms&quot;) govern your use of the FLOWN website, mobile applications, and related services (collectively, the &quot;Service&quot;). By accessing or using the Service, you agree to be bound by these Terms.
+              These Terms of Service (&quot;Terms&quot;) govern your use of the FOCUSED website, mobile applications, and related services (collectively, the &quot;Service&quot;). By accessing or using the Service, you agree to be bound by these Terms.
             </p>
             <p className="text-foreground/60">
               If you are using the Service on behalf of a company or organization, you represent and warrant that you have the authority to bind that entity to these Terms.
@@ -141,7 +141,7 @@ export default function TermsPage() {
           <div className="card-ios ios-shadow-lg p-8 mb-12">
             <h2 className="text-2xl font-bold text-foreground mb-4">Limitation of Liability</h2>
             <p className="text-foreground/60 mb-4">
-              To the maximum extent permitted by law, FLOWN shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses.
+              To the maximum extent permitted by law, FOCUSED shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses.
             </p>
             <p className="text-foreground/60">
               Our total liability to you for all claims under these Terms shall not exceed the amount you paid to us in the twelve months preceding the claim.
@@ -152,7 +152,7 @@ export default function TermsPage() {
           <div className="card-ios ios-shadow-lg p-8 mb-12">
             <h2 className="text-2xl font-bold text-foreground mb-4">Governing Law</h2>
             <p className="text-foreground/60">
-              These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which FLOWN is headquartered, without regard to its conflict of law provisions. Any disputes arising under these Terms shall be resolved through binding arbitration.
+              These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which FOCUSED is headquartered, without regard to its conflict of law provisions. Any disputes arising under these Terms shall be resolved through binding arbitration.
             </p>
           </div>
 
@@ -168,10 +168,10 @@ export default function TermsPage() {
                   If you have any questions about these Terms of Service, please contact our legal team.
                 </p>
                 <a
-                  href="mailto:legal@flown.com"
+                  href="mailto:legal@focused.com"
                   className="text-ios-blue hover:underline font-medium"
                 >
-                  legal@flown.com
+                  legal@focused.com
                 </a>
               </div>
             </div>

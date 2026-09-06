@@ -15,7 +15,7 @@ export default function ForTeamsPage() {
     {
       icon: TrendingUp,
       title: "Increased Productivity",
-      description: "Teams report 40% increase in focused work hours within the first month of using FLOWN.",
+      description: "Teams report 40% increase in focused work hours within the first month of using FOCUSED.",
       stat: "40%",
     },
     {
@@ -70,7 +70,7 @@ export default function ForTeamsPage() {
       name: "Sarah Chen",
       role: "VP of Engineering",
       company: "TechFlow Inc.",
-      quote: "FLOWN transformed how our engineering team works. We've seen a massive improvement in code quality and shipping speed.",
+      quote: "FOCUSED transformed how our engineering team works. We've seen a massive improvement in code quality and shipping speed.",
     },
     {
       name: "Michael Roberts",
@@ -89,7 +89,7 @@ export default function ForTeamsPage() {
           {/* Hero Section */}
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
-              FLOWN for Teams
+              FOCUSED for Teams
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
               Empower your organization with collective focus. Build a culture of deep work and sustainable productivity.
@@ -169,7 +169,7 @@ export default function ForTeamsPage() {
               Ready to Transform Your Team&apos;s Focus?
             </h2>
             <p className="text-foreground/60 mb-8 max-w-xl mx-auto">
-              Schedule a demo to see how FLOWN can help your team achieve deep work at scale.
+              Schedule a demo to see how FOCUSED can help your team achieve deep work at scale.
             </p>
             <div className="flex justify-center gap-4">
               <a

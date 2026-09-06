@@ -50,7 +50,7 @@ export default function AdminPackagesPage() {
   const DURATION_OPTIONS = ['monthly', 'quarterly', 'yearly', 'lifetime'];
   const REGION_OPTIONS = ['US', 'UK', 'NG', 'CA', 'AU', 'DE', 'FR', 'IN', 'BR', 'ZA'];
 
-  const isAdmin = user?.isStaff || user?.email === 'admin@flown.com';
+  const isAdmin = user?.isStaff || user?.email === 'admin@focused.com';
 
   const loadPackages = useCallback(async () => {
     try {

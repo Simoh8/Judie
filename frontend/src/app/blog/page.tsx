@@ -31,7 +31,7 @@ export default function BlogPage() {
     {
       id: 2,
       title: "10 Tips for Your First Focus Session",
-      excerpt: "Getting started with focused work? Here are our top tips for making the most of your first FLOWN session.",
+      excerpt: "Getting started with focused work? Here are our top tips for making the most of your first FOCUSED session.",
       author: "Sarah Chen",
       date: "2024-01-10",
       category: "Tips & Tricks",
@@ -40,9 +40,9 @@ export default function BlogPage() {
     },
     {
       id: 3,
-      title: "FLOWN 2.0: What's New and Improved",
+      title: "FOCUSED 2.0: What's New and Improved",
       excerpt: "We've launched major updates to our platform including new session types, enhanced analytics, and team features.",
-      author: "Team FLOWN",
+      author: "Team FOCUSED",
       date: "2024-01-05",
       category: "Company News",
       readTime: "6 min read",
@@ -96,7 +96,7 @@ export default function BlogPage() {
           {/* Hero Section */}
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
-              FLOWN Blog
+              FOCUSED Blog
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
               Insights, tips, and stories about focused work, productivity, and the science of deep concentration.
@@ -182,7 +182,7 @@ export default function BlogPage() {
               Stay Focused with Our Newsletter
             </h2>
             <p className="text-foreground/60 mb-8 max-w-xl mx-auto">
-              Get the latest insights on focused work, productivity tips, and FLOWN updates delivered to your inbox.
+              Get the latest insights on focused work, productivity tips, and FOCUSED updates delivered to your inbox.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
               <input

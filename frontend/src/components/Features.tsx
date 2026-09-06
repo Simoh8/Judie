@@ -39,7 +39,7 @@ export default function Features() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16 animate-slide-up">
           <h2 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
-            Why FLOWN works
+            Why FOCUSED works
           </h2>
           <p className="text-xl text-foreground/70 max-w-2xl mx-auto">
             Backed by neuroscience and designed for real human focus

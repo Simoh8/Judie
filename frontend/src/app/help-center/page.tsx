@@ -45,7 +45,7 @@ export default function HelpCenterPage() {
       id: 4,
       title: "Managing your subscription",
       category: "account",
-      content: "How to upgrade, downgrade, or cancel your FLOWN subscription.",
+      content: "How to upgrade, downgrade, or cancel your FOCUSED subscription.",
     },
     {
       id: 5,
@@ -57,7 +57,7 @@ export default function HelpCenterPage() {
       id: 6,
       title: "Using the mobile app",
       category: "getting-started",
-      content: "Guide to using FLOWN on your mobile device for focus on the go.",
+      content: "Guide to using FOCUSED on your mobile device for focus on the go.",
     },
   ];
 
@@ -87,7 +87,7 @@ export default function HelpCenterPage() {
               Help Center
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
-              Find answers to your questions and get the most out of FLOWN.
+              Find answers to your questions and get the most out of FOCUSED.
             </p>
             <p className="text-sm text-foreground/40 mt-4">
               Last updated: {currentDate}
@@ -176,7 +176,7 @@ export default function HelpCenterPage() {
               Still Need Help?
             </h2>
             <p className="text-foreground/60 mb-8 max-w-xl mx-auto">
-              Our support team is here to help you get the most out of FLOWN.
+              Our support team is here to help you get the most out of FOCUSED.
             </p>
             <a
               href="/contact"
