@@ -5,6 +5,7 @@ from .views import (
     GoogleLoginView, GoogleOAuthCallbackView,
     SessionViewSet, UserViewSet, ReviewViewSet, LeadRequestViewSet,
     ForgotPasswordView, ResetPasswordView, VerifyResetTokenView,
+    PackageViewSet, PurchaseViewSet,
 )
 
 router = DefaultRouter()
@@ -12,6 +13,8 @@ router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'reviews', ReviewViewSet, basename='review')
 router.register(r'lead-requests', LeadRequestViewSet, basename='lead-request')
+router.register(r'packages', PackageViewSet, basename='package')
+router.register(r'purchases', PurchaseViewSet, basename='purchase')
 
 urlpatterns = [
     path('auth/signup/', SignupView.as_view(), name='signup'),
@@ -23,5 +26,7 @@ urlpatterns = [
     path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
     # Step 3: allauth's callback triggers LOGIN_REDIRECT_URL → this view
     path('auth/google/callback/', GoogleOAuthCallbackView.as_view(), name='google_oauth_callback'),
+    # Paystack webhook endpoint
+    path('payments/webhook/', PurchaseViewSet.as_view({'post': 'webhook'}), name='paystack_webhook'),
     path('', include(router.urls)),
 ]

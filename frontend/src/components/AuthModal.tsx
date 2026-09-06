@@ -59,7 +59,7 @@ export default function AuthModal({
     // Redirect directly to the backend's allauth Google login endpoint.
     // This allows allauth to generate the necessary 'state' parameter 
     // and set the session cookie to prevent CSRF errors on callback.
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "";
+    const backendUrl = process.env.NEXT__BACKEND_URL ?? "";
     window.location.href = `${backendUrl}/accounts/google/login/`;
   };
 

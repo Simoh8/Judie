@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import User, Session, Booking, Review, LeadRequest
+from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -129,3 +129,60 @@ class LeadRequestCreateSerializer(serializers.ModelSerializer):
             existing.delete()
         
         return attrs
+
+
+class PackageSerializer(serializers.ModelSerializer):
+    duration = serializers.CharField(source='get_duration_display', read_only=True)
+    maxLeadRequests = serializers.IntegerField(source='max_lead_requests')
+    maxSessions = serializers.IntegerField(source='max_sessions')
+    allowedSessionTypes = serializers.JSONField(source='allowed_session_types')
+    maxSessionDuration = serializers.IntegerField(source='max_session_duration')
+    supportedRegions = serializers.JSONField(source='supported_regions')
+    isFeatured = serializers.BooleanField(source='is_featured')
+    sortOrder = serializers.IntegerField(source='sort_order')
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = Package
+        fields = ['id', 'name', 'description', 'price', 'duration', 
+                  'maxLeadRequests', 'maxSessions', 'allowedSessionTypes', 
+                  'maxSessionDuration', 'supportedRegions', 'is_active', 
+                  'isFeatured', 'sortOrder', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'createdAt', 'updatedAt']
+
+
+class PackageCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Package
+        fields = ['name', 'description', 'price', 'duration', 
+                  'max_lead_requests', 'max_sessions', 'allowed_session_types', 
+                  'max_session_duration', 'supported_regions', 'is_active', 
+                  'is_featured', 'sort_order']
+
+
+class PurchaseSerializer(serializers.ModelSerializer):
+    package = PackageSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
+    status = serializers.CharField(source='get_status_display', read_only=True)
+    paystackReference = serializers.CharField(source='paystack_reference', read_only=True)
+    paystackTransactionId = serializers.CharField(source='paystack_transaction_id', read_only=True)
+    sessionsUsed = serializers.IntegerField(source='sessions_used')
+    leadRequestsUsed = serializers.IntegerField(source='lead_requests_used')
+    validFrom = serializers.DateTimeField(source='valid_from')
+    validUntil = serializers.DateTimeField(source='valid_until')
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = Purchase
+        fields = ['id', 'package', 'user', 'status', 'amount', 'currency',
+                  'paystackReference', 'paystackTransactionId', 'sessionsUsed',
+                  'leadRequestsUsed', 'validFrom', 'validUntil', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'createdAt', 'updatedAt']
+
+
+class PurchaseCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Purchase
+        fields = ['user', 'package', 'amount', 'currency', 'valid_from', 'valid_until']

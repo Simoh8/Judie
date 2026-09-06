@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      const backendUrl = process.env.NEXT__BACKEND_URL || "http://localhost:8000";
       const response = await fetch(`${backendUrl}/api/auth/forgot-password/`, {
         method: "POST",
         headers: {

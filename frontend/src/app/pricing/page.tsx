@@ -1,90 +1,112 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Crown, Zap, Users, Building2, HeadphonesIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, Crown, Zap, Building2, ArrowRight, CreditCard, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface Package {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  duration: string;
+  maxLeadRequests: number;
+  maxSessions: number;
+  allowedSessionTypes: string[];
+  maxSessionDuration: number;
+  supportedRegions: string[];
+  is_active: boolean;
+  isFeatured: boolean;
+  sortOrder: number;
+}
 
 export default function PricingPage() {
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  const { user } = useAuth();
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingPurchase, setProcessingPurchase] = useState<string | null>(null);
 
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
+  useEffect(() => {
+    loadPackages();
+  }, []);
 
-  const plans = [
-    {
-      name: "Free",
-      icon: Zap,
-      price: { monthly: 0, yearly: 0 },
-      description: "Perfect for getting started with focused work.",
-      features: [
-        "5 focus sessions per month",
-        "Basic session types",
-        "Community access",
-        "Progress tracking",
-        "Email support",
-      ],
-      cta: "Get Started",
-      popular: false,
-    },
-    {
-      name: "Pro",
-      icon: Crown,
-      price: { monthly: 19, yearly: 15 },
-      description: "For serious focus practitioners and professionals.",
-      features: [
-        "Unlimited focus sessions",
-        "All session types",
-        "Priority booking",
-        "Advanced analytics",
-        "Custom focus goals",
-        "Priority support",
-        "Mobile app access",
-      ],
-      cta: "Start Pro Trial",
-      popular: true,
-    },
-    {
-      name: "Teams",
-      icon: Building2,
-      price: { monthly: 49, yearly: 39 },
-      description: "For teams and organizations that need to focus together.",
-      features: [
-        "Everything in Pro",
-        "Team dashboard",
-        "Admin controls",
-        "Team analytics",
-        "Custom branding",
-        "Dedicated support",
-        "SLA guarantee",
-        "API access",
-      ],
-      cta: "Contact Sales",
-      popular: false,
-    },
-  ];
+  const loadPackages = async () => {
+    try {
+      const response = await fetch('/api/packages?active=true');
+      const data = await response.json();
+      if (data.success && data.packages) {
+        setPackages(data.packages);
+      }
+    } catch (error) {
+      console.error("Failed to load packages:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const faqs = [
-    {
-      question: "Can I change plans anytime?",
-      answer: "Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate your billing accordingly.",
-    },
-    {
-      question: "What payment methods do you accept?",
-      answer: "We accept all major credit cards (Visa, MasterCard, American Express) and PayPal. For enterprise plans, we also accept bank transfers.",
-    },
-    {
-      question: "Is there a free trial for paid plans?",
-      answer: "Yes, we offer a 14-day free trial for both Pro and Teams plans. No credit card required to start your trial.",
-    },
-    {
-      question: "Do you offer refunds?",
-      answer: "We offer a 30-day money-back guarantee for all paid plans. If you're not satisfied, contact our support team for a full refund.",
-    },
-  ];
+  const handlePurchase = async (packageId: string) => {
+    if (!user) {
+      window.location.href = '/auth/login';
+      return;
+    }
+
+    setProcessingPurchase(packageId);
+
+    try {
+      // Create purchase record
+      const purchaseResponse = await fetch('/api/purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: user.id,
+          package: packageId
+        })
+      });
+
+      const purchaseData = await purchaseResponse.json();
+      
+      if (purchaseData.success) {
+        // Initiate payment
+        const paymentResponse = await fetch(`/api/purchases/${purchaseData.purchase.id}/initiate_payment`, {
+          method: 'POST'
+        });
+
+        const paymentData = await paymentResponse.json();
+        
+        if (paymentData.success && paymentData.paymentUrl) {
+          // Redirect to Paystack payment page
+          window.location.href = paymentData.paymentUrl;
+        } else {
+          alert('Failed to initiate payment. Please try again.');
+        }
+      } else {
+        alert(purchaseData.error || 'Failed to create purchase. Please try again.');
+      }
+    } catch (error) {
+      console.error("Purchase failed:", error);
+      alert('Purchase failed. Please try again.');
+    } finally {
+      setProcessingPurchase(null);
+    }
+  };
+
+  const getIconForPackage = (packageName: string) => {
+    if (packageName.toLowerCase().includes('basic') || packageName.toLowerCase().includes('free')) return Zap;
+    if (packageName.toLowerCase().includes('team') || packageName.toLowerCase().includes('enterprise')) return Building2;
+    return Crown;
+  };
+
+  const formatDuration = (duration: string) => {
+    return duration.charAt(0).toUpperCase() + duration.slice(1);
+  };
+
+  const getCtaText = (pkg: Package) => {
+    if (!user) return "Sign Up to Purchase";
+    if (pkg.price === 0) return "Get Started Free";
+    return "Purchase Package";
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-ios-gray-950">
@@ -98,88 +120,126 @@ export default function PricingPage() {
               Simple, Transparent Pricing
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
-              Choose the plan that fits your focus goals. Start free, upgrade when you&apos;re ready.
+              Choose the plan that fits your focus goals. All prices in USD.
             </p>
-            <p className="text-sm text-foreground/40 mt-4">
-              Last updated: {currentDate}
-            </p>
-          </div>
-
-          {/* Billing Toggle */}
-          <div className="flex justify-center items-center gap-4 mb-12">
-            <button
-              onClick={() => setBillingPeriod("monthly")}
-              className={`px-6 py-3 rounded-full font-medium transition-colors ${
-                billingPeriod === "monthly"
-                  ? "bg-ios-blue text-white"
-                  : "bg-ios-gray-100 dark:bg-ios-gray-800 text-foreground/60 hover:text-foreground"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingPeriod("yearly")}
-              className={`px-6 py-3 rounded-full font-medium transition-colors relative ${
-                billingPeriod === "yearly"
-                  ? "bg-ios-blue text-white"
-                  : "bg-ios-gray-100 dark:bg-ios-gray-800 text-foreground/60 hover:text-foreground"
-              }`}
-            >
-              Yearly
-              <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                Save 20%
-              </span>
-            </button>
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid md:grid-cols-3 gap-8 mb-20">
-            {plans.map((plan) => (
-              <div
-                key={plan.name}
-                className={`card-ios ios-shadow-lg p-8 relative ${
-                  plan.popular ? "border-2 border-ios-blue" : ""
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-ios-blue text-white px-4 py-1 rounded-full text-sm font-medium">
-                    Most Popular
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="animate-spin text-ios-blue" size={40} />
+            </div>
+          ) : packages.length === 0 ? (
+            <div className="text-center py-20 text-foreground/60">
+              No packages available at the moment. Please check back later.
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
+              {packages.map((pkg) => {
+                const Icon = getIconForPackage(pkg.name);
+                return (
+                  <div
+                    key={pkg.id}
+                    className={`card-ios ios-shadow-lg p-8 relative ${
+                      pkg.isFeatured ? "border-2 border-ios-blue" : ""
+                    }`}
+                  >
+                    {pkg.isFeatured && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-ios-blue text-white px-4 py-1 rounded-full text-sm font-medium">
+                        Most Popular
+                      </div>
+                    )}
+                    <div className="w-16 h-16 rounded-full bg-ios-blue/10 flex items-center justify-center mb-6">
+                      <Icon size={32} className="text-ios-blue" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-foreground mb-2">
+                      {pkg.name}
+                    </h3>
+                    <p className="text-foreground/60 mb-6">{pkg.description}</p>
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold text-foreground">
+                        ${pkg.price}
+                      </span>
+                      <span className="text-foreground/60">
+                        /{formatDuration(pkg.duration)}
+                      </span>
+                    </div>
+                    
+                    <ul className="space-y-3 mb-8">
+                      <li className="flex items-start gap-3">
+                        <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-foreground/80">{pkg.maxSessions} sessions per {pkg.duration}</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-foreground/80">{pkg.maxLeadRequests} lead requests per {pkg.duration}</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-foreground/80">Max {pkg.maxSessionDuration} min session duration</span>
+                      </li>
+                      {pkg.allowedSessionTypes.length > 0 && (
+                        <li className="flex items-start gap-3">
+                          <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground/80">
+                            Session types: {pkg.allowedSessionTypes.join(', ')}
+                          </span>
+                        </li>
+                      )}
+                      {pkg.supportedRegions.length > 0 && (
+                        <li className="flex items-start gap-3">
+                          <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground/80">
+                            Available in: {pkg.supportedRegions.join(', ')}
+                          </span>
+                        </li>
+                      )}
+                    </ul>
+                    
+                    <button
+                      onClick={() => handlePurchase(pkg.id)}
+                      disabled={processingPurchase === pkg.id}
+                      className={`w-full py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
+                        pkg.isFeatured
+                          ? "btn-ios btn-primary"
+                          : "bg-ios-gray-100 dark:bg-ios-gray-800 text-foreground hover:bg-ios-gray-200 dark:hover:bg-ios-gray-700"
+                      } ${processingPurchase === pkg.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {processingPurchase === pkg.id ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          {getCtaText(pkg)}
+                          <ArrowRight size={20} />
+                        </>
+                      )}
+                    </button>
                   </div>
-                )}
-                <div className="w-16 h-16 rounded-full bg-ios-blue/10 flex items-center justify-center mb-6">
-                  <plan.icon size={32} className="text-ios-blue" />
+                );
+              })}
+            </div>
+          )}
+
+          {/* Payment Info */}
+          <div className="max-w-3xl mx-auto mb-20">
+            <div className="card-ios ios-shadow-lg p-8 bg-gradient-to-br from-ios-blue/5 to-purple-500/5">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-green-100 dark:bg-green-900 rounded-xl">
+                  <CreditCard className="text-green-600 dark:text-green-300" size={24} />
                 </div>
-                <h3 className="text-2xl font-bold text-foreground mb-2">
-                  {plan.name}
-                </h3>
-                <p className="text-foreground/60 mb-6">{plan.description}</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-foreground">
-                    ${plan.price[billingPeriod]}
-                  </span>
-                  <span className="text-foreground/60">
-                    /{billingPeriod === "monthly" ? "month" : "month (billed yearly)"}
-                  </span>
+                <div>
+                  <h3 className="text-xl font-semibold text-foreground">Secure Payment</h3>
+                  <p className="text-foreground/60">Powered by Paystack</p>
                 </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-foreground/80">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  className={`w-full py-3 rounded-xl font-medium transition-colors ${
-                    plan.popular
-                      ? "btn-ios btn-primary"
-                      : "bg-ios-gray-100 dark:bg-ios-gray-800 text-foreground hover:bg-ios-gray-200 dark:hover:bg-ios-gray-700"
-                  }`}
-                >
-                  {plan.cta}
-                </button>
               </div>
-            ))}
+              <p className="text-foreground/70">
+                We use Paystack to process payments securely. Paystack accepts all major credit cards and 
+                supports payments from multiple countries. Your payment information is encrypted and secure.
+              </p>
+            </div>
           </div>
 
           {/* FAQ Section */}
@@ -188,24 +248,52 @@ export default function PricingPage() {
               Frequently Asked Questions
             </h2>
             <div className="space-y-6">
-              {faqs.map((faq, index) => (
-                <div key={index} className="card-ios ios-shadow-lg p-6">
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    {faq.question}
-                  </h3>
-                  <p className="text-foreground/60">{faq.answer}</p>
-                </div>
-              ))}
+              <div className="card-ios ios-shadow-lg p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Can I change packages anytime?
+                </h3>
+                <p className="text-foreground/60">
+                  Yes, you can upgrade or downgrade your package at any time. Changes take effect immediately, 
+                  and we'll handle the billing accordingly.
+                </p>
+              </div>
+              <div className="card-ios ios-shadow-lg p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  What payment methods do you accept?
+                </h3>
+                <p className="text-foreground/60">
+                  We accept all major credit cards (Visa, MasterCard, American Express) through Paystack. 
+                  Paystack also supports mobile money and bank transfers in supported regions.
+                </p>
+              </div>
+              <div className="card-ios ios-shadow-lg p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Is there a free trial?
+                </h3>
+                <p className="text-foreground/60">
+                  Some packages may include a trial period. Check the specific package details for more information 
+                  about trial availability and duration.
+                </p>
+              </div>
+              <div className="card-ios ios-shadow-lg p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Do you offer refunds?
+                </h3>
+                <p className="text-foreground/60">
+                  Refund policies vary by package. Please contact our support team for assistance with any 
+                  refund requests.
+                </p>
+              </div>
             </div>
           </div>
 
           {/* CTA Section */}
           <div className="text-center card-ios ios-shadow-lg p-12 bg-gradient-to-br from-ios-blue/5 to-purple-500/5">
             <h2 className="text-3xl font-bold text-foreground mb-4">
-              Not Sure Which Plan to Choose?
+              Not Sure Which Package to Choose?
             </h2>
             <p className="text-foreground/60 mb-8 max-w-xl mx-auto">
-              Our team can help you find the perfect plan for your needs. Get in touch for personalized recommendations.
+              Our team can help you find the perfect package for your needs. Get in touch for personalized recommendations.
             </p>
             <a
               href="/contact"

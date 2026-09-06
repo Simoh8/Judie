@@ -13,10 +13,12 @@ import os
 import re
 import jwt
 import requests as http_requests
-from .models import User, Session, Booking, Review, LeadRequest
-from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer
+from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase
+from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer, PackageSerializer, PackageCreateSerializer, PurchaseSerializer, PurchaseCreateSerializer
 from .zoom_service import ZoomService
 from .email_service import EmailService
+from .paystack_service import PaystackService
+import json
 
 
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
@@ -1091,4 +1093,255 @@ You can approve or reject this request in the admin dashboard.
 
         serializer = self.get_serializer(lead_request)
         return Response({'success': True, 'leadRequest': serializer.data})
+
+
+class PackageViewSet(viewsets.ModelViewSet):
+    queryset = Package.objects.all()
+    serializer_class = PackageSerializer
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return PackageCreateSerializer
+        return PackageSerializer
+
+    def get_queryset(self):
+        queryset = Package.objects.all()
+        active_only = self.request.query_params.get('active')
+        featured_only = self.request.query_params.get('featured')
+        
+        if active_only == 'true':
+            queryset = queryset.filter(is_active=True)
+        
+        if featured_only == 'true':
+            queryset = queryset.filter(is_featured=True)
+        
+        return queryset.order_by('sort_order', 'price')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'success': True, 'packages': serializer.data})
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({'success': True, 'package': PackageSerializer(serializer.instance).data}, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({'success': True, 'package': PackageSerializer(serializer.instance).data})
+
+
+class PurchaseViewSet(viewsets.ModelViewSet):
+    queryset = Purchase.objects.all()
+    serializer_class = PurchaseSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return PurchaseCreateSerializer
+        return PurchaseSerializer
+
+    def get_queryset(self):
+        queryset = Purchase.objects.all()
+        user_id = self.request.query_params.get('user')
+        status_filter = self.request.query_params.get('status')
+        
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        return queryset.order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'success': True, 'purchases': serializer.data})
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Get package details
+        package = serializer.validated_data['package']
+        user = serializer.validated_data['user']
+        
+        # Set amount from package price if not provided
+        if 'amount' not in serializer.validated_data or not serializer.validated_data['amount']:
+            serializer.validated_data['amount'] = package.price
+        
+        # Set default currency if not provided
+        if 'currency' not in serializer.validated_data or not serializer.validated_data['currency']:
+            serializer.validated_data['currency'] = 'USD'
+        
+        # Calculate validity period based on package duration
+        valid_from = serializer.validated_data.get('valid_from', timezone.now())
+        if package.duration == 'monthly':
+            valid_until = valid_from + timedelta(days=30)
+        elif package.duration == 'quarterly':
+            valid_until = valid_from + timedelta(days=90)
+        elif package.duration == 'yearly':
+            valid_until = valid_from + timedelta(days=365)
+        else:  # lifetime
+            valid_until = valid_from + timedelta(days=365*10)  # 10 years for practical purposes
+        
+        serializer.validated_data['valid_from'] = valid_from
+        serializer.validated_data['valid_until'] = valid_until
+        
+        self.perform_create(serializer)
+        return Response({'success': True, 'purchase': PurchaseSerializer(serializer.instance).data}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'])
+    def webhook(self, request):
+        """Handle Paystack webhook events"""
+        try:
+            # Get the raw request body
+            payload = json.loads(request.body)
+            
+            # Get the signature from headers
+            signature = request.headers.get('x-paystack-signature', '')
+            
+            # Process the webhook
+            if PaystackService.process_webhook(payload, signature):
+                return Response({'success': True}, status=status.HTTP_200_OK)
+            else:
+                return Response({'success': False}, status=status.HTTP_400_BAD_REQUEST)
+                
+        except json.JSONDecodeError:
+            return Response({'success': False, 'error': 'Invalid JSON'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def initiate_payment(self, request, pk=None):
+        """Initiate Paystack payment for a purchase"""
+        purchase = self.get_object()
+        
+        if purchase.status != 'pending':
+            return Response(
+                {'success': False, 'error': 'Purchase is not in pending status'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Generate Paystack payment URL
+            payment_url = PaystackService.initiate_payment(
+                email=purchase.user.email,
+                amount=purchase.amount,
+                reference=purchase.paystack_reference or PaystackService.generate_reference("PURCHASE"),
+                metadata={
+                    'purchase_id': purchase.id,
+                    'user_id': purchase.user.id,
+                    'package_id': purchase.package.id
+                }
+            )
+            
+            if payment_url:
+                # Update purchase with reference
+                if not purchase.paystack_reference:
+                    purchase.paystack_reference = payment_url.get('reference', PaystackService.generate_reference("PURCHASE"))
+                    purchase.save()
+                
+                return Response({
+                    'success': True,
+                    'paymentUrl': payment_url.get('authorization_url'),
+                    'reference': purchase.paystack_reference
+                })
+            else:
+                return Response(
+                    {'success': False, 'error': 'Failed to initiate payment'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        except Exception as e:
+            return Response(
+                {'success': False, 'error': f'Payment initiation failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'])
+    def verify_payment(self, request, pk=None):
+        """Verify Paystack payment and update purchase status"""
+        purchase = self.get_object()
+        reference = request.data.get('reference')
+        
+        if not reference:
+            return Response(
+                {'success': False, 'error': 'Reference is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Verify payment with Paystack
+            verification_result = PaystackService.verify_payment(reference)
+            
+            if verification_result and verification_result.get('status'):
+                # Update purchase status
+                purchase.status = 'completed'
+                purchase.paystack_transaction_id = verification_result.get('transaction_id')
+                purchase.save()
+                
+                return Response({
+                    'success': True,
+                    'purchase': PurchaseSerializer(purchase).data
+                })
+            else:
+                purchase.status = 'failed'
+                purchase.save()
+                return Response(
+                    {'success': False, 'error': 'Payment verification failed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {'success': False, 'error': f'Payment verification failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'])
+    def user_active_packages(self, request):
+        """Get active packages for a user"""
+        user_id = request.query_params.get('user_id')
+        
+        if not user_id:
+            return Response(
+                {'success': False, 'error': 'User ID is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'success': False, 'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get active purchases for the user
+        active_purchases = Purchase.objects.filter(
+            user=user,
+            status='completed',
+            valid_from__lte=timezone.now(),
+            valid_until__gte=timezone.now()
+        )
+        
+        packages = []
+        for purchase in active_purchases:
+            packages.append({
+                'package': PackageSerializer(purchase.package).data,
+                'purchase': PurchaseSerializer(purchase).data,
+                'remainingSessions': purchase.package.max_sessions - purchase.sessions_used,
+                'remainingLeadRequests': purchase.package.max_lead_requests - purchase.lead_requests_used,
+                'validUntil': purchase.valid_until
+            })
+        
+        return Response({
+            'success': True,
+            'activePackages': packages
+        })
 

@@ -146,3 +146,76 @@ class Review(models.Model):
         unique_together = ['session', 'user']
         ordering = ['-created_at']
 
+
+class Package(models.Model):
+    DURATION_CHOICES = [
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('yearly', 'Yearly'),
+        ('lifetime', 'Lifetime'),
+    ]
+
+    name = models.CharField(max_length=200)
+    description = models.TextField()
+    price = models.DecimalField(max_digits=10, decimal_places=2)  # Price in USD
+    duration = models.CharField(max_length=20, choices=DURATION_CHOICES, default='monthly')
+    
+    # Features
+    max_lead_requests = models.IntegerField(default=0, help_text="Maximum lead requests per period")
+    max_sessions = models.IntegerField(default=0, help_text="Maximum sessions to join per period")
+    allowed_session_types = models.JSONField(default=list, help_text="List of allowed session types")
+    max_session_duration = models.IntegerField(default=120, help_text="Maximum session duration in minutes")
+    
+    # Regional support
+    supported_regions = models.JSONField(default=list, help_text="List of supported region codes (e.g., ['US', 'UK', 'NG'])")
+    
+    # Display settings
+    is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False)
+    sort_order = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} - ${self.price}"
+
+    class Meta:
+        ordering = ['sort_order', 'price']
+
+
+class Purchase(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='purchases')
+    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='purchases')
+    
+    # Payment details
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default='USD')
+    
+    # Paystack integration
+    paystack_reference = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    paystack_transaction_id = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Usage tracking
+    sessions_used = models.IntegerField(default=0)
+    lead_requests_used = models.IntegerField(default=0)
+    valid_from = models.DateTimeField()
+    valid_until = models.DateTimeField()
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.package.name} ({self.status})"
+
+    class Meta:
+        ordering = ['-created_at']
+
