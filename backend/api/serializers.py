@@ -167,32 +167,57 @@ class PurchaseSerializer(serializers.ModelSerializer):
     package = PackageSerializer(read_only=True)
     user = UserSerializer(read_only=True)
     status = serializers.CharField(source='get_status_display', read_only=True)
+    paymentMethod = serializers.CharField(source='get_payment_method_display', read_only=True)
+    reconciliationStatus = serializers.CharField(source='get_reconciliation_status_display', read_only=True)
     paystackReference = serializers.CharField(source='paystack_reference', read_only=True)
     paystackTransactionId = serializers.CharField(source='paystack_transaction_id', read_only=True)
     sessionsUsed = serializers.IntegerField(source='sessions_used')
     leadRequestsUsed = serializers.IntegerField(source='lead_requests_used')
     validFrom = serializers.DateTimeField(source='valid_from')
     validUntil = serializers.DateTimeField(source='valid_until')
+    paymentDate = serializers.DateTimeField(source='payment_date', read_only=True)
+    invoiceNumber = serializers.CharField(source='invoice_number', read_only=True)
+    receiptUrl = serializers.URLField(source='receipt_url', read_only=True)
+    adminNotes = serializers.CharField(source='admin_notes', read_only=True)
+    reconciledBy = UserSerializer(read_only=True)
+    reconciledAt = serializers.DateTimeField(source='reconciled_at', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
 
     class Meta:
         model = Purchase
         fields = ['id', 'package', 'user', 'status', 'amount', 'currency',
+                  'paymentMethod', 'paymentDate', 'invoiceNumber', 'receiptUrl',
+                  'reconciliationStatus', 'adminNotes', 'reconciledBy', 'reconciledAt',
                   'paystackReference', 'paystackTransactionId', 'sessionsUsed',
                   'leadRequestsUsed', 'validFrom', 'validUntil', 'createdAt', 'updatedAt']
-        read_only_fields = ['id', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'createdAt', 'updatedAt', 'paymentDate', 'reconciledAt']
 
 
 class PurchaseCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase
-        fields = ['user', 'package', 'amount', 'currency', 'valid_from', 'valid_until']
+        fields = ['user', 'package', 'amount', 'currency', 'payment_method', 'valid_from', 'valid_until']
         extra_kwargs = {
             'amount': {'required': False},
             'currency': {'required': False},
+            'payment_method': {'required': False},
             'valid_from': {'required': False},
             'valid_until': {'required': False},
+        }
+
+
+class PurchaseReconciliationSerializer(serializers.ModelSerializer):
+    """Serializer for admin payment reconciliation operations"""
+    class Meta:
+        model = Purchase
+        fields = ['status', 'reconciliation_status', 'admin_notes', 'receipt_url', 'invoice_number']
+        extra_kwargs = {
+            'status': {'required': False},
+            'reconciliation_status': {'required': True},
+            'admin_notes': {'required': False},
+            'receipt_url': {'required': False},
+            'invoice_number': {'required': False},
         }
 
 

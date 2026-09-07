@@ -460,8 +460,8 @@ export default function AdminSettingsPage() {
             </div>
           )}
 
-          {/* View Mode Toggle */}
-          <div className="flex gap-2 mb-6">
+          {/* View/Category Selection */}
+          <div className="flex flex-wrap gap-2 mb-6">
             <button
               onClick={() => setViewMode('database')}
               className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-colors ${
@@ -484,30 +484,26 @@ export default function AdminSettingsPage() {
               <FileText size={20} />
               Environment Variables
             </button>
+            
+            {/* Category Tabs - only show for database mode */}
+            {viewMode === 'database' && categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setActiveCategory(category.id)}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${
+                  activeCategory === category.id
+                    ? `bg-${category.color}-600 text-white`
+                    : 'bg-white dark:bg-ios-gray-800 text-foreground hover:bg-ios-gray-100 dark:hover:bg-ios-gray-700'
+                }`}
+              >
+                {category.icon}
+                {category.name}
+              </button>
+            ))}
           </div>
 
-          {/* Category Tabs - only show for database mode */}
-          {viewMode === 'database' && (
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${
-                    activeCategory === category.id
-                      ? `bg-${category.color}-600 text-white`
-                      : 'bg-white dark:bg-ios-gray-800 text-foreground hover:bg-ios-gray-100 dark:hover:bg-ios-gray-700'
-                  }`}
-                >
-                  {category.icon}
-                  {category.name}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Action Buttons */}
-          <div className="flex gap-4 mb-6">
+          <div className="flex flex-wrap gap-3 mb-6">
             {viewMode === 'database' ? (
               <>
                 <button

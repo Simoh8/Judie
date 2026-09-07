@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.db import transaction
+from django.db import models
 from django.conf import settings
 from django.core.mail import send_mail
 import os
@@ -15,7 +16,7 @@ import jwt
 import requests as http_requests
 from pathlib import Path
 from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase, SystemSettings
-from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer, PackageSerializer, PackageCreateSerializer, PurchaseSerializer, PurchaseCreateSerializer, SystemSettingsSerializer, SystemSettingsCreateSerializer, SystemSettingsUpdateSerializer
+from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer, PackageSerializer, PackageCreateSerializer, PurchaseSerializer, PurchaseCreateSerializer, PurchaseReconciliationSerializer, SystemSettingsSerializer, SystemSettingsCreateSerializer, SystemSettingsUpdateSerializer
 from .zoom_service import ZoomService
 from .email_service import EmailService
 from .paystack_service import PaystackService
@@ -1365,6 +1366,155 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         return Response({
             'success': True,
             'activePackages': packages
+        })
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    def reconcile_payment(self, request, pk=None):
+        """Admin endpoint to reconcile payment status"""
+        purchase = self.get_object()
+        
+        serializer = PurchaseReconciliationSerializer(purchase, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
+        # Update reconciliation details
+        purchase.reconciliation_status = serializer.validated_data.get('reconciliation_status', purchase.reconciliation_status)
+        purchase.admin_notes = serializer.validated_data.get('admin_notes', purchase.admin_notes)
+        purchase.receipt_url = serializer.validated_data.get('receipt_url', purchase.receipt_url)
+        purchase.invoice_number = serializer.validated_data.get('invoice_number', purchase.invoice_number)
+        
+        # Update status if provided
+        if 'status' in serializer.validated_data:
+            purchase.status = serializer.validated_data['status']
+            # Set payment date if status is being set to completed
+            if purchase.status == 'completed' and not purchase.payment_date:
+                purchase.payment_date = timezone.now()
+        
+        # Track who reconciled and when
+        purchase.reconciled_by = request.user
+        purchase.reconciled_at = timezone.now()
+        
+        purchase.save()
+        
+        return Response({
+            'success': True,
+            'purchase': PurchaseSerializer(purchase).data,
+            'message': 'Payment reconciled successfully'
+        })
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    def generate_invoice(self, request, pk=None):
+        """Admin endpoint to generate invoice number for a purchase"""
+        purchase = self.get_object()
+        
+        if purchase.invoice_number:
+            return Response(
+                {'success': False, 'error': 'Invoice already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate unique invoice number
+        import uuid
+        invoice_prefix = "INV"
+        timestamp = timezone.now().strftime('%Y%m%d')
+        unique_id = str(uuid.uuid4())[:8].upper()
+        invoice_number = f"{invoice_prefix}-{timestamp}-{unique_id}"
+        
+        purchase.invoice_number = invoice_number
+        purchase.save()
+        
+        return Response({
+            'success': True,
+            'purchase': PurchaseSerializer(purchase).data,
+            'invoiceNumber': invoice_number
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
+    def payment_report(self, request):
+        """Admin endpoint to get payment statistics and reports"""
+        # Get query parameters for filtering
+        status_filter = request.query_params.get('status')
+        reconciliation_filter = request.query_params.get('reconciliation_status')
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        
+        queryset = Purchase.objects.all()
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        if reconciliation_filter:
+            queryset = queryset.filter(reconciliation_status=reconciliation_filter)
+        
+        if date_from:
+            queryset = queryset.filter(created_at__gte=date_from)
+        
+        if date_to:
+            queryset = queryset.filter(created_at__lte=date_to)
+        
+        # Calculate statistics
+        total_purchases = queryset.count()
+        completed_payments = queryset.filter(status='completed').count()
+        pending_payments = queryset.filter(status='pending').count()
+        failed_payments = queryset.filter(status='failed').count()
+        refunded_payments = queryset.filter(status='refunded').count()
+        
+        # Reconciliation statistics
+        pending_reconciliation = queryset.filter(reconciliation_status='pending').count()
+        matched_payments = queryset.filter(reconciliation_status='matched').count()
+        disputed_payments = queryset.filter(reconciliation_status='disputed').count()
+        
+        # Revenue calculations
+        total_revenue = queryset.filter(status='completed').aggregate(
+            total=models.Sum('amount')
+        )['total'] or 0
+        
+        # Get recent purchases
+        recent_purchases = queryset.order_by('-created_at')[:20]
+        
+        return Response({
+            'success': True,
+            'statistics': {
+                'totalPurchases': total_purchases,
+                'completedPayments': completed_payments,
+                'pendingPayments': pending_payments,
+                'failedPayments': failed_payments,
+                'refundedPayments': refunded_payments,
+                'pendingReconciliation': pending_reconciliation,
+                'matchedPayments': matched_payments,
+                'disputedPayments': disputed_payments,
+                'totalRevenue': float(total_revenue)
+            },
+            'recentPurchases': PurchaseSerializer(recent_purchases, many=True).data
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
+    def unreconciled_payments(self, request):
+        """Admin endpoint to get all payments pending reconciliation"""
+        unreconciled = Purchase.objects.filter(
+            reconciliation_status='pending'
+        ).order_by('-created_at')
+        
+        return Response({
+            'success': True,
+            'unreconciledPayments': PurchaseSerializer(unreconciled, many=True).data,
+            'count': unreconciled.count()
+        })
+
+    @action(detail=True, methods=['get'])
+    def user_payment_history(self, request, pk=None):
+        """Get payment history for a specific purchase (user-facing)"""
+        purchase = self.get_object()
+        
+        # Ensure user can only see their own purchases
+        if purchase.user != request.user and not request.user.is_staff:
+            return Response(
+                {'success': False, 'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return Response({
+            'success': True,
+            'purchase': PurchaseSerializer(purchase).data
         })
 
 
