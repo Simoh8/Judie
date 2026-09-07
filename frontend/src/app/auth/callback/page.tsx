@@ -33,8 +33,13 @@ export default function AuthCallback() {
         // Update the Zustand store
         useUserStore.setState({ user, token, loading: false });
 
-        // Redirect to dashboard
-        router.push("/dashboard");
+        // Check if there is a pending package purchase waiting
+        const pendingPkgId = localStorage.getItem("pending_package_id");
+        if (pendingPkgId) {
+          router.push("/pricing?auto_purchase=true");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         // OAuth failed — redirect to home with error flag
         router.push("/?error=oauth_failed");

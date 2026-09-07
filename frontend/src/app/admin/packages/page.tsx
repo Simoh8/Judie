@@ -13,6 +13,7 @@ interface Package {
   description: string;
   price: number;
   duration: string;
+  trialDays?: number;
   maxLeadRequests: number;
   maxSessions: number;
   allowedSessionTypes: string[];
@@ -36,6 +37,7 @@ export default function AdminPackagesPage() {
     description: '',
     price: '',
     duration: 'monthly',
+    trial_days: '0',
     max_lead_requests: '',
     max_sessions: '',
     allowed_session_types: [] as string[],
@@ -78,6 +80,7 @@ export default function AdminPackagesPage() {
         body: JSON.stringify({
           ...formData,
           price: parseFloat(formData.price),
+          trial_days: parseInt(formData.trial_days || '0'),
           max_lead_requests: parseInt(formData.max_lead_requests),
           max_sessions: parseInt(formData.max_sessions),
           max_session_duration: parseInt(formData.max_session_duration),
@@ -108,6 +111,7 @@ export default function AdminPackagesPage() {
         body: JSON.stringify({
           ...formData,
           price: parseFloat(formData.price),
+          trial_days: parseInt(formData.trial_days || '0'),
           max_lead_requests: parseInt(formData.max_lead_requests),
           max_sessions: parseInt(formData.max_sessions),
           max_session_duration: parseInt(formData.max_session_duration),
@@ -155,6 +159,7 @@ export default function AdminPackagesPage() {
       description: pkg.description,
       price: pkg.price.toString(),
       duration: pkg.duration,
+      trial_days: pkg.trialDays?.toString() || (pkg as any).trial_days?.toString() || '0',
       max_lead_requests: pkg.maxLeadRequests.toString(),
       max_sessions: pkg.maxSessions.toString(),
       allowed_session_types: pkg.allowedSessionTypes,
@@ -173,6 +178,7 @@ export default function AdminPackagesPage() {
       description: '',
       price: '',
       duration: 'monthly',
+      trial_days: '0',
       max_lead_requests: '',
       max_sessions: '',
       allowed_session_types: [],
@@ -377,7 +383,7 @@ export default function AdminPackagesPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Price (USD)</label>
                       <input
@@ -400,6 +406,17 @@ export default function AdminPackagesPage() {
                           <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
                         ))}
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Trial Days</label>
+                      <input
+                        type="number"
+                        value={formData.trial_days}
+                        onChange={(e) => setFormData(prev => ({ ...prev, trial_days: e.target.value }))}
+                        className="w-full p-3 border border-ios-gray-300 dark:border-ios-gray-600 rounded-xl bg-white dark:bg-ios-gray-700 text-foreground"
+                        placeholder="0"
+                        min="0"
+                      />
                     </div>
                   </div>
 

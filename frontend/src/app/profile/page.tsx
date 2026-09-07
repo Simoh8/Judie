@@ -1,11 +1,34 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserStore } from "@/stores/userStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
-import { User, Mail, Calendar, Clock, Users, Save, CheckCircle, AlertCircle } from "lucide-react";
+import { User, Mail, Calendar, Clock, Users, Save, CheckCircle, AlertCircle, Crown, Zap, ArrowUpRight, ShieldCheck } from "lucide-react";
+
+interface ActivePackageInfo {
+  package: {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    duration: string;
+    maxLeadRequests: number;
+    maxSessions: number;
+  };
+  purchase: {
+    id: string;
+    status: string;
+    created_at: string;
+    valid_from: string;
+    valid_until: string;
+  };
+  remainingSessions: number;
+  remainingLeadRequests: number;
+  validUntil: string;
+}
 
 export default function Profile() {
   const { user } = useAuth();
@@ -13,11 +36,34 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [activePackage, setActivePackage] = useState<ActivePackageInfo | null>(null);
+  const [loadingPackage, setLoadingPackage] = useState(true);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
     email: user?.email || "",
   });
+
+  useEffect(() => {
+    if (user?.id) {
+      loadActivePackage(user.id);
+    }
+  }, [user?.id]);
+
+  const loadActivePackage = async (userId: string) => {
+    try {
+      setLoadingPackage(true);
+      const response = await fetch(`/api/purchases/user_active_packages/?user_id=${userId}`);
+      const data = await response.json();
+      if (data.success && data.activePackages && data.activePackages.length > 0) {
+        setActivePackage(data.activePackages[0]);
+      }
+    } catch (err) {
+      console.error("Failed to load active package:", err);
+    } finally {
+      setLoadingPackage(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -190,6 +236,70 @@ export default function Profile() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Subscription & Active Package Section */}
+                <div className="card-ios p-6 border-2 border-ios-blue/30 relative overflow-hidden">
+                  <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-gradient-to-br from-ios-blue to-purple-600 rounded-2xl text-white shadow-md">
+                        <Crown size={24} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-bold text-foreground">
+                            {activePackage ? activePackage.package.name : "Free Plan"}
+                          </h3>
+                          <span className="text-xs bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <ShieldCheck size={12} />
+                            Active
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground/60 mt-0.5">
+                          {activePackage
+                            ? `$${activePackage.package.price} / ${activePackage.package.duration}`
+                            : "Standard basic access"}
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href="/pricing"
+                      className="btn-ios btn-primary text-sm flex items-center gap-1.5 shrink-0"
+                    >
+                      <Zap size={16} />
+                      Upgrade Package
+                      <ArrowUpRight size={16} />
+                    </Link>
+                  </div>
+
+                  {loadingPackage ? (
+                    <div className="text-xs text-foreground/50 animate-pulse pt-2">Loading package details...</div>
+                  ) : activePackage ? (
+                    <div className="mt-4 pt-4 border-t border-ios-gray-200 dark:border-ios-gray-700 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-foreground/60 block text-xs">Valid Until</span>
+                        <span className="font-semibold text-foreground">
+                          {new Date(activePackage.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-foreground/60 block text-xs">Remaining Sessions</span>
+                        <span className="font-semibold text-foreground">
+                          {activePackage.remainingSessions > 999 ? "Unlimited" : activePackage.remainingSessions}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-foreground/60 block text-xs">Lead Requests</span>
+                        <span className="font-semibold text-foreground">
+                          {activePackage.remainingLeadRequests > 999 ? "Unlimited" : activePackage.remainingLeadRequests}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-sm text-foreground/60">
+                      Upgrade your plan anytime to unlock unlimited focus sessions and priority features.
+                    </div>
+                  )}
                 </div>
 
                 <div className="card-ios p-6">

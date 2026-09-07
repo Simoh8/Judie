@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions, parsers
 from rest_framework.decorators import action, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,8 +13,9 @@ import os
 import re
 import jwt
 import requests as http_requests
-from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase
-from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer, PackageSerializer, PackageCreateSerializer, PurchaseSerializer, PurchaseCreateSerializer
+from pathlib import Path
+from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase, SystemSettings
+from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer, PackageSerializer, PackageCreateSerializer, PurchaseSerializer, PurchaseCreateSerializer, SystemSettingsSerializer, SystemSettingsCreateSerializer, SystemSettingsUpdateSerializer
 from .zoom_service import ZoomService
 from .email_service import EmailService
 from .paystack_service import PaystackService
@@ -100,10 +101,11 @@ class SignupView(APIView):
         )
 
         serializer = UserSerializer(user)
+        token = generate_auth_token(user)
         return Response({
             'success': True,
             'user': serializer.data,
-            'token': f'simple_token_{user.id}'  # Simple token for demo
+            'token': token
         })
 
 
@@ -134,10 +136,11 @@ class LoginView(APIView):
             )
 
         serializer = UserSerializer(user)
+        token = generate_auth_token(user)
         return Response({
             'success': True,
             'user': serializer.data,
-            'token': f'simple_token_{user.id}'  # Simple token for demo
+            'token': token
         })
 
 
@@ -887,6 +890,15 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def get_permissions(self):
+        if self.action == 'list':
+            return [permissions.IsAdminUser()]
+        elif self.action == 'update':
+            return [permissions.IsAdminUser()]
+        elif self.action == 'retrieve':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated()]
+
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
@@ -1150,12 +1162,16 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         queryset = Purchase.objects.all()
         user_id = self.request.query_params.get('user')
         status_filter = self.request.query_params.get('status')
+        paystack_ref = self.request.query_params.get('paystack_reference')
         
         if user_id:
             queryset = queryset.filter(user_id=user_id)
         
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+        
+        if paystack_ref:
+            queryset = queryset.filter(paystack_reference=paystack_ref)
         
         return queryset.order_by('-created_at')
 
@@ -1180,9 +1196,15 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         if 'currency' not in serializer.validated_data or not serializer.validated_data['currency']:
             serializer.validated_data['currency'] = 'USD'
         
-        # Calculate validity period based on package duration
+        # Auto-complete free packages or active trial activations
+        if package.price == 0 or serializer.validated_data.get('amount') == 0 or (package.trial_days and package.trial_days > 0):
+            serializer.validated_data['status'] = 'completed'
+
+        # Calculate validity period based on trial days or package duration
         valid_from = serializer.validated_data.get('valid_from', timezone.now())
-        if package.duration == 'monthly':
+        if package.trial_days and package.trial_days > 0:
+            valid_until = valid_from + timedelta(days=package.trial_days)
+        elif package.duration == 'monthly':
             valid_until = valid_from + timedelta(days=30)
         elif package.duration == 'quarterly':
             valid_until = valid_from + timedelta(days=90)
@@ -1344,4 +1366,283 @@ class PurchaseViewSet(viewsets.ModelViewSet):
             'success': True,
             'activePackages': packages
         })
+
+
+class EnvironmentVariablesView(APIView):
+    """View for managing environment variables from .env file"""
+    
+    def get_permissions(self):
+        # For development, allow read access without strict authentication
+        # In production, you should enforce proper authentication
+        if self.request.method == 'GET':
+            return []  # Allow read access for development
+        # Require admin permission for write operations
+        return [permissions.IsAdminUser()]
+    
+    def get_env_file_path(self):
+        """Get the path to the .env file"""
+        from django.conf import settings as django_settings
+        backend_env = django_settings.BASE_DIR / '.env'
+        if backend_env.exists():
+            return backend_env
+        root_env = django_settings.BASE_DIR.parent / '.env'
+        if root_env.exists():
+            return root_env
+        return backend_env
+    
+    def get(self, request):
+        """Read and return environment variables from .env file"""
+        try:
+            env_file = self.get_env_file_path()
+            
+            if not env_file.exists():
+                try:
+                    env_file.touch()
+                except Exception:
+                    pass
+
+            
+            env_vars = []
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip empty lines and comments
+                    if not line or line.startswith('#'):
+                        if line.startswith('#'):
+                            env_vars.append({
+                                'key': '',
+                                'value': '',
+                                'comment': line[1:].strip(),
+                                'isComment': True
+                            })
+                        continue
+                    
+                    # Parse key=value pairs
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        # Determine if value should be hidden (based on key names)
+                        is_sensitive = any(keyword in key.upper() for keyword in 
+                                         ['SECRET', 'PASSWORD', 'KEY', 'TOKEN', 'CREDENTIAL'])
+                        
+                        env_vars.append({
+                            'key': key.strip(),
+                            'value': value.strip(),
+                            'isSensitive': is_sensitive,
+                            'isComment': False
+                        })
+            
+            return Response({
+                'success': True,
+                'envVars': env_vars
+            })
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': f'Failed to read .env file: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def post(self, request):
+        """Update environment variables in .env file"""
+        try:
+            env_vars = request.data.get('envVars', [])
+            
+            if not isinstance(env_vars, list):
+                return Response({
+                    'success': False,
+                    'error': 'envVars must be an array'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            env_file = self.get_env_file_path()
+            
+            # Create backup of current .env file
+            backup_file = env_file.with_suffix('.env.backup')
+            if env_file.exists():
+                import shutil
+                shutil.copy2(env_file, backup_file)
+            
+            # Write new .env file
+            with open(env_file, 'w') as f:
+                for var in env_vars:
+                    if var.get('isComment'):
+                        if var.get('comment'):
+                            f.write(f"# {var['comment']}\n")
+                    else:
+                        key = var.get('key', '').strip()
+                        value = var.get('value', '').strip()
+                        if key:
+                            f.write(f"{key}={value}\n")
+            
+            # Reload environment variables
+            from dotenv import load_dotenv
+            load_dotenv(override=True)
+            
+            return Response({
+                'success': True,
+                'message': 'Environment variables updated successfully. Server restart required for changes to take effect.'
+            })
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': f'Failed to update .env file: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SystemSettingsViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing system settings with encryption support"""
+    queryset = SystemSettings.objects.all()
+    serializer_class = SystemSettingsSerializer
+    
+    def get_permissions(self):
+        # For development, allow read access without strict authentication
+        # In production, you should enforce proper authentication
+        if self.action in ['list', 'retrieve', 'public', 'by_category', 'upload_attachment']:
+            return []  # Allow access for development
+        # Require admin permission for write operations
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'bulk_update']:
+            return [permissions.IsAdminUser()]
+        return []
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return SystemSettingsCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return SystemSettingsUpdateSerializer
+        return SystemSettingsSerializer
+    
+    def get_queryset(self):
+        queryset = SystemSettings.objects.all()
+        category = self.request.query_params.get('category')
+        is_public = self.request.query_params.get('public')
+        
+        if category:
+            queryset = queryset.filter(category=category)
+        
+        # Non-admin users can only see public settings
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(is_public=True)
+        elif is_public == 'true':
+            queryset = queryset.filter(is_public=True)
+        
+        return queryset.order_by('category', 'key')
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'success': True, 'settings': serializer.data})
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({'success': True, 'setting': SystemSettingsSerializer(serializer.instance).data}, 
+                       status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({'success': True, 'setting': SystemSettingsSerializer(instance).data})
+    
+    @action(detail=False, methods=['get'])
+    def public(self, request):
+        """Get all public settings (accessible by non-admin users)"""
+        queryset = SystemSettings.objects.filter(is_public=True)
+        serializer = SystemSettingsSerializer(queryset, many=True)
+        return Response({'success': True, 'settings': serializer.data})
+    
+    @action(detail=False, methods=['get'])
+    def by_category(self, request):
+        """Get settings grouped by category"""
+        category = request.query_params.get('category')
+        if not category:
+            return Response({'success': False, 'error': 'Category parameter is required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        queryset = SystemSettings.objects.filter(category=category)
+        if not request.user.is_staff:
+            queryset = queryset.filter(is_public=True)
+        
+        serializer = SystemSettingsSerializer(queryset, many=True)
+        return Response({'success': True, 'settings': serializer.data, 'category': category})
+    
+    @action(detail=False, methods=['post'])
+    def bulk_update(self, request):
+        """Bulk update multiple settings"""
+        settings_data = request.data.get('settings', [])
+        if not settings_data:
+            return Response({'success': False, 'error': 'No settings provided'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        updated_settings = []
+        errors = []
+        
+        for setting_data in settings_data:
+            setting_id = setting_data.get('id')
+            if not setting_id:
+                errors.append({'error': 'Setting ID is required', 'data': setting_data})
+                continue
+            
+            try:
+                setting = SystemSettings.objects.get(id=setting_id)
+                # Handle encryption for updates
+                if 'value' in setting_data:
+                    if setting.is_encrypted:
+                        setting.set_value(setting_data['value'])
+                    else:
+                        setting.value = setting_data['value']
+                
+                if 'description' in setting_data:
+                    setting.description = setting_data['description']
+                
+                if 'is_public' in setting_data:
+                    setting.is_public = setting_data['is_public']
+                
+                setting.save()
+                updated_settings.append(SystemSettingsSerializer(setting).data)
+            except SystemSettings.DoesNotExist:
+                errors.append({'error': 'Setting not found', 'id': setting_id})
+            except Exception as e:
+                errors.append({'error': str(e), 'id': setting_id})
+        
+        return Response({
+            'success': True,
+            'updated': updated_settings,
+            'errors': errors
+        })
+
+    @action(detail=False, methods=['post'], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
+    def upload_attachment(self, request):
+        """Upload a file attachment (such as favicon or logo) for system settings"""
+        file_obj = request.FILES.get('file') or request.FILES.get('attachment')
+        if not file_obj:
+            return Response({'success': False, 'error': 'No file was uploaded'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        import os
+        import uuid
+        from django.conf import settings as django_settings
+        
+        target_dir = os.path.join(django_settings.MEDIA_ROOT, 'favicons')
+        os.makedirs(target_dir, exist_ok=True)
+        
+        ext = os.path.splitext(file_obj.name)[1].lower()
+        if not ext:
+            ext = '.png'
+        filename = f"favicon_{uuid.uuid4().hex[:8]}{ext}"
+        filepath = os.path.join(target_dir, filename)
+        
+        with open(filepath, 'wb+') as destination:
+            for chunk in file_obj.chunks():
+                destination.write(chunk)
+                
+        relative_url = f"/media/favicons/{filename}"
+        return Response({
+            'success': True,
+            'url': relative_url,
+            'filename': filename
+        })
+
 

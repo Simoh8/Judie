@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import FaviconHead from "@/components/FaviconHead";
 
 export const metadata: Metadata = {
   title: "FOCUSED | Body Doubling & Virtual Co-working for Focus",
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
+          <FaviconHead />
           {children}
         </AuthProvider>
       </body>

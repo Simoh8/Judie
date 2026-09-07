@@ -6,7 +6,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight, Crown, Check, X, DollarSign } from "lucide-react";
+import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight, Crown, Check, X, DollarSign, Settings } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
@@ -222,6 +222,22 @@ export default function AdminDashboardPage() {
                       <div>
                         <div className="font-medium text-foreground">Manage Packages</div>
                         <div className="text-sm text-foreground/60">Create and manage pricing packages</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="text-foreground/40" size={20} />
+                  </a>
+
+                  <a
+                    href="/admin/settings"
+                    className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                        <Settings className="text-orange-600 dark:text-orange-300" size={20} />
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">System Settings</div>
+                        <div className="text-sm text-foreground/60">Manage app configuration and API keys</div>
                       </div>
                     </div>
                     <ArrowRight className="text-foreground/40" size={20} />

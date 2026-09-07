@@ -5,7 +5,7 @@ from .views import (
     GoogleLoginView, GoogleOAuthCallbackView,
     SessionViewSet, UserViewSet, ReviewViewSet, LeadRequestViewSet,
     ForgotPasswordView, ResetPasswordView, VerifyResetTokenView,
-    PackageViewSet, PurchaseViewSet,
+    PackageViewSet, PurchaseViewSet, SystemSettingsViewSet, EnvironmentVariablesView,
 )
 
 router = DefaultRouter()
@@ -15,6 +15,7 @@ router.register(r'reviews', ReviewViewSet, basename='review')
 router.register(r'lead-requests', LeadRequestViewSet, basename='lead-request')
 router.register(r'packages', PackageViewSet, basename='package')
 router.register(r'purchases', PurchaseViewSet, basename='purchase')
+router.register(r'settings', SystemSettingsViewSet, basename='settings')
 
 urlpatterns = [
     path('auth/signup/', SignupView.as_view(), name='signup'),
@@ -28,5 +29,7 @@ urlpatterns = [
     path('auth/google/callback/', GoogleOAuthCallbackView.as_view(), name='google_oauth_callback'),
     # Paystack webhook endpoint
     path('payments/webhook/', PurchaseViewSet.as_view({'post': 'webhook'}), name='paystack_webhook'),
+    # Environment variables management
+    path('environment-variables/', EnvironmentVariablesView.as_view(), name='environment_variables'),
     path('', include(router.urls)),
 ]

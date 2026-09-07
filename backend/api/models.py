@@ -1,5 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
+from cryptography.fernet import Fernet
+from django.conf import settings
+import base64
 
 
 class CustomUserManager(BaseUserManager):
@@ -159,6 +163,7 @@ class Package(models.Model):
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)  # Price in USD
     duration = models.CharField(max_length=20, choices=DURATION_CHOICES, default='monthly')
+    trial_days = models.IntegerField(default=0, help_text="Number of trial days for this package")
     
     # Features
     max_lead_requests = models.IntegerField(default=0, help_text="Maximum lead requests per period")
@@ -218,4 +223,100 @@ class Purchase(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class EncryptionManager:
+    """Helper class for encryption/decryption operations"""
+    
+    @staticmethod
+    def get_encryption_key():
+        """Get or create encryption key from settings"""
+        key = getattr(settings, 'SETTINGS_ENCRYPTION_KEY', None)
+        if not key:
+            # Generate a new key if none exists
+            key = Fernet.generate_key()
+            print(f"Generated new encryption key. Add this to your .env: SETTINGS_ENCRYPTION_KEY={key.decode()}")
+        # Ensure key is bytes
+        if isinstance(key, str):
+            key = key.encode()
+        return key
+    
+    @staticmethod
+    def encrypt(value):
+        """Encrypt a value"""
+        if not value:
+            return value
+        key = EncryptionManager.get_encryption_key()
+        fernet = Fernet(key)
+        encrypted = fernet.encrypt(value.encode())
+        return base64.b64encode(encrypted).decode()
+    
+    @staticmethod
+    def decrypt(encrypted_value):
+        """Decrypt a value"""
+        if not encrypted_value:
+            return encrypted_value
+        try:
+            key = EncryptionManager.get_encryption_key()
+            fernet = Fernet(key)
+            decoded = base64.b64decode(encrypted_value.encode())
+            decrypted = fernet.decrypt(decoded)
+            return decrypted.decode()
+        except Exception as e:
+            print(f"Decryption error: {e}")
+            return encrypted_value
+
+
+class SystemSettings(models.Model):
+    """Model for storing system-wide settings with encryption support"""
+    
+    CATEGORY_CHOICES = [
+        ('frontend', 'Frontend Settings'),
+        ('backend', 'Backend Settings'),
+        ('general', 'General Settings'),
+    ]
+    
+    SETTING_TYPE_CHOICES = [
+        ('string', 'String'),
+        ('number', 'Number'),
+        ('boolean', 'Boolean'),
+        ('json', 'JSON'),
+        ('encrypted', 'Encrypted String'),
+    ]
+    
+    key = models.CharField(max_length=255, unique=True, help_text="Unique setting key")
+    value = models.TextField(help_text="Setting value (encrypted if type is 'encrypted')")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
+    setting_type = models.CharField(max_length=20, choices=SETTING_TYPE_CHOICES, default='string')
+    description = models.TextField(blank=True, help_text="Description of what this setting does")
+    is_encrypted = models.BooleanField(default=False, help_text="Whether this value should be encrypted")
+    is_public = models.BooleanField(default=False, help_text="Whether this setting can be accessed by non-admin users")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def save(self, *args, **kwargs):
+        # Encrypt value if needed before saving
+        if self.is_encrypted and self.value:
+            self.value = EncryptionManager.encrypt(self.value)
+        super().save(*args, **kwargs)
+    
+    def get_decrypted_value(self):
+        """Get the decrypted value if encrypted"""
+        if self.is_encrypted and self.value:
+            return EncryptionManager.decrypt(self.value)
+        return self.value
+    
+    def set_value(self, value):
+        """Set value with automatic encryption if needed"""
+        if self.is_encrypted and value:
+            self.value = EncryptionManager.encrypt(value)
+        else:
+            self.value = value
+    
+    def __str__(self):
+        return f"{self.category}.{self.key}"
+    
+    class Meta:
+        ordering = ['category', 'key']
+        verbose_name_plural = "System Settings"
 

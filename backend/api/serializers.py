@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase
+from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase, SystemSettings
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -9,12 +9,12 @@ class UserSerializer(serializers.ModelSerializer):
     focusHours = serializers.DecimalField(source='focus_hours', read_only=True, max_digits=5, decimal_places=2)
     sessionsJoined = serializers.IntegerField(source='sessions_joined', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
-    isStaff = serializers.BooleanField(source='is_staff', read_only=True)
+    isStaff = serializers.BooleanField(source='is_staff', required=False)
 
     class Meta:
         model = User
         fields = ['id', 'email', 'username', 'firstName', 'lastName', 'focusHours', 'sessionsJoined', 'createdAt', 'isStaff']
-        read_only_fields = ['id', 'email', 'username', 'focusHours', 'sessionsJoined', 'createdAt', 'isStaff']
+        read_only_fields = ['id', 'email', 'username', 'focusHours', 'sessionsJoined', 'createdAt']
 
 
 class SessionSerializer(serializers.ModelSerializer):
@@ -133,6 +133,8 @@ class LeadRequestCreateSerializer(serializers.ModelSerializer):
 
 class PackageSerializer(serializers.ModelSerializer):
     duration = serializers.CharField(source='get_duration_display', read_only=True)
+    rawDuration = serializers.CharField(source='duration', read_only=True)
+    trialDays = serializers.IntegerField(source='trial_days')
     maxLeadRequests = serializers.IntegerField(source='max_lead_requests')
     maxSessions = serializers.IntegerField(source='max_sessions')
     allowedSessionTypes = serializers.JSONField(source='allowed_session_types')
@@ -145,7 +147,7 @@ class PackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Package
-        fields = ['id', 'name', 'description', 'price', 'duration', 
+        fields = ['id', 'name', 'description', 'price', 'duration', 'rawDuration', 'trialDays',
                   'maxLeadRequests', 'maxSessions', 'allowedSessionTypes', 
                   'maxSessionDuration', 'supportedRegions', 'is_active', 
                   'isFeatured', 'sortOrder', 'createdAt', 'updatedAt']
@@ -155,7 +157,7 @@ class PackageSerializer(serializers.ModelSerializer):
 class PackageCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Package
-        fields = ['name', 'description', 'price', 'duration', 
+        fields = ['name', 'description', 'price', 'duration', 'trial_days',
                   'max_lead_requests', 'max_sessions', 'allowed_session_types', 
                   'max_session_duration', 'supported_regions', 'is_active', 
                   'is_featured', 'sort_order']
@@ -186,3 +188,52 @@ class PurchaseCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase
         fields = ['user', 'package', 'amount', 'currency', 'valid_from', 'valid_until']
+        extra_kwargs = {
+            'amount': {'required': False},
+            'currency': {'required': False},
+            'valid_from': {'required': False},
+            'valid_until': {'required': False},
+        }
+
+
+class SystemSettingsSerializer(serializers.ModelSerializer):
+    decryptedValue = serializers.SerializerMethodField()
+    categoryDisplay = serializers.CharField(source='get_category_display', read_only=True)
+    typeDisplay = serializers.CharField(source='get_setting_type_display', read_only=True)
+    
+    class Meta:
+        model = SystemSettings
+        fields = ['id', 'key', 'value', 'decryptedValue', 'category', 'categoryDisplay', 
+                  'setting_type', 'typeDisplay', 'description', 'is_encrypted', 'is_public', 
+                  'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_decryptedValue(self, obj):
+        """Return decrypted value for encrypted settings"""
+        if obj.is_encrypted:
+            return obj.get_decrypted_value()
+        return obj.value
+
+
+class SystemSettingsCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemSettings
+        fields = ['key', 'value', 'category', 'setting_type', 'description', 'is_encrypted', 'is_public']
+    
+    def validate(self, attrs):
+        # Ensure encryption is only used with string type
+        if attrs.get('is_encrypted') and attrs.get('setting_type') != 'string':
+            raise serializers.ValidationError('Encryption can only be used with string type settings')
+        return attrs
+
+
+class SystemSettingsUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemSettings
+        fields = ['value', 'description', 'is_encrypted', 'is_public']
+    
+    def validate(self, attrs):
+        # Ensure encryption is only used with string type
+        if attrs.get('is_encrypted') and self.instance.setting_type != 'string':
+            raise serializers.ValidationError('Encryption can only be used with string type settings')
+        return attrs

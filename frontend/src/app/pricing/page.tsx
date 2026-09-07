@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Crown, Zap, Building2, ArrowRight, CreditCard, Loader2 } from "lucide-react";
+import { Check, Crown, Zap, Building2, ArrowRight, CreditCard, Loader2, AlertCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
+import AuthModal from "@/components/AuthModal";
 
 interface Package {
   id: string;
@@ -27,10 +28,27 @@ export default function PricingPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPurchase, setProcessingPurchase] = useState<string | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [pendingPackageId, setPendingPackageId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPackages();
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedPending = localStorage.getItem('pending_package_id');
+      if (storedPending && user) {
+        localStorage.removeItem('pending_package_id');
+        setPendingPackageId(null);
+        handlePurchase(storedPending);
+      } else if (user && pendingPackageId) {
+        const pkgId = pendingPackageId;
+        setPendingPackageId(null);
+        handlePurchase(pkgId);
+      }
+    }
+  }, [user, pendingPackageId]);
 
   const loadPackages = async () => {
     try {
@@ -48,7 +66,11 @@ export default function PricingPage() {
 
   const handlePurchase = async (packageId: string) => {
     if (!user) {
-      window.location.href = '/auth/login';
+      if (typeof window !== "undefined") {
+        localStorage.setItem('pending_package_id', packageId);
+      }
+      setPendingPackageId(packageId);
+      setIsAuthModalOpen(true);
       return;
     }
 
@@ -68,7 +90,13 @@ export default function PricingPage() {
       const purchaseData = await purchaseResponse.json();
       
       if (purchaseData.success) {
-        // Initiate payment
+        if (purchaseData.purchase && purchaseData.purchase.status === 'completed') {
+          alert('Package activated successfully!');
+          window.location.href = '/profile';
+          return;
+        }
+
+        // Initiate payment with Paystack
         const paymentResponse = await fetch(`/api/purchases/${purchaseData.purchase.id}/initiate_payment`, {
           method: 'POST'
         });
@@ -76,10 +104,10 @@ export default function PricingPage() {
         const paymentData = await paymentResponse.json();
         
         if (paymentData.success && paymentData.paymentUrl) {
-          // Redirect to Paystack payment page
+          // Redirect to Paystack checkout page
           window.location.href = paymentData.paymentUrl;
         } else {
-          alert('Failed to initiate payment. Please try again.');
+          alert(paymentData.error || 'Failed to initiate payment with Paystack. Please try again.');
         }
       } else {
         alert(purchaseData.error || 'Failed to create purchase. Please try again.');
@@ -114,6 +142,19 @@ export default function PricingPage() {
       
       <main className="pt-24 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
+          {/* Expired Subscription Notice Banner */}
+          {typeof window !== "undefined" && window.location.search.includes('expired=true') && (
+            <div className="mb-8 p-6 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-3xl flex items-center gap-4 text-amber-800 dark:text-amber-300 animate-slide-down shadow-sm">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/60 rounded-2xl shrink-0">
+                <AlertCircle size={28} className="text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold">Subscription or Trial Expired</h3>
+                <p className="text-sm opacity-90">Your active package or trial period has ended. Please select or renew a package below to restore full access to all features.</p>
+              </div>
+            </div>
+          )}
+
           {/* Hero Section */}
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
@@ -305,6 +346,7 @@ export default function PricingPage() {
         </div>
       </main>
 
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <Footer />
     </div>
   );
