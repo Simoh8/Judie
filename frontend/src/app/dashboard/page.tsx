@@ -99,7 +99,7 @@ export default function Dashboard() {
       setLoadingSessionId(null);
     }
   };
-
+  
   const handleSessionAction = async () => {
     // Refresh all data when a session action occurs (join/cancel)
     const promises = [

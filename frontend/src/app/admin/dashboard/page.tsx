@@ -178,7 +178,7 @@ export default function AdminDashboardPage() {
               {/* Quick Actions */}
               <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm mb-8">
                 <h2 className="text-xl font-semibold text-foreground mb-4">Quick Actions</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <a
                     href="/admin/sessions"
                     className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
@@ -222,6 +222,22 @@ export default function AdminDashboardPage() {
                       <div>
                         <div className="font-medium text-foreground">Manage Packages</div>
                         <div className="text-sm text-foreground/60">Create and manage pricing packages</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="text-foreground/40" size={20} />
+                  </a>
+
+                  <a
+                    href="/admin/payments"
+                    className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                        <DollarSign className="text-green-600 dark:text-green-300" size={20} />
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">Manage Payments</div>
+                        <div className="text-sm text-foreground/60">View and reconcile payment transactions</div>
                       </div>
                     </div>
                     <ArrowRight className="text-foreground/40" size={20} />

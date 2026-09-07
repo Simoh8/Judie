@@ -334,7 +334,7 @@ export default function AdminUsersPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 text-foreground">
                             <Clock size={16} className="text-foreground/40" />
-                            <span className="font-medium">{parseFloat(userItem.focusHours).toFixed(1)}</span>
+                            <span className="font-medium">{Number(userItem.focusHours).toFixed(1)}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
