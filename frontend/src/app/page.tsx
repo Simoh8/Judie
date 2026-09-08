@@ -1,7 +1,6 @@
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
-import SessionTypes from "@/components/SessionTypes";
 import Testimonials from "@/components/Testimonials";
 import CTA from "@/components/CTA";
 import Navbar from "@/components/Navbar";
@@ -14,7 +13,6 @@ export default function Home() {
       <Hero />
       <Features />
       <HowItWorks />
-      <SessionTypes />
       <Testimonials />
       <CTA />
       <Footer />
