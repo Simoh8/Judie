@@ -10,6 +10,8 @@ from django.db import transaction
 from django.db import models
 from django.conf import settings
 from django.core.mail import send_mail
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 import os
 import re
 import jwt
@@ -62,6 +64,7 @@ def verify_google_id_token(id_token: str) -> dict | None:
         return None
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SignupView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -110,6 +113,7 @@ class SignupView(APIView):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -145,6 +149,7 @@ class LoginView(APIView):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class GoogleLoginView(APIView):
     def post(self, request):
         """
@@ -211,6 +216,7 @@ class GoogleLoginView(APIView):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class GoogleOAuthCallbackView(APIView):
     def get(self, request):
         """
@@ -239,6 +245,7 @@ class GoogleOAuthCallbackView(APIView):
         return redirect(redirect_url)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class ForgotPasswordView(APIView):
     def post(self, request):
         """Initiate password reset by sending email with reset link"""
@@ -300,6 +307,7 @@ class ForgotPasswordView(APIView):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class ResetPasswordView(APIView):
     def post(self, request):
         """Reset password using valid token"""
@@ -350,6 +358,7 @@ class ResetPasswordView(APIView):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class VerifyResetTokenView(APIView):
     def get(self, request):
         """Verify if a reset token is valid"""
@@ -378,6 +387,7 @@ class VerifyResetTokenView(APIView):
             })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SessionViewSet(viewsets.ModelViewSet):
     queryset = Session.objects.all()
     serializer_class = SessionSerializer
@@ -887,6 +897,7 @@ See you there!
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -927,6 +938,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response({'success': True, 'sessions': serializer.data})
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
@@ -971,6 +983,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return Response({'success': True, 'reviews': serializer.data})
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LeadRequestViewSet(viewsets.ModelViewSet):
     queryset = LeadRequest.objects.all()
     serializer_class = LeadRequestSerializer
@@ -1108,6 +1121,7 @@ You can approve or reject this request in the admin dashboard.
         return Response({'success': True, 'leadRequest': serializer.data})
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class PackageViewSet(viewsets.ModelViewSet):
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
@@ -1150,6 +1164,7 @@ class PackageViewSet(viewsets.ModelViewSet):
         return Response({'success': True, 'package': PackageSerializer(serializer.instance).data})
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class PurchaseViewSet(viewsets.ModelViewSet):
     queryset = Purchase.objects.all()
     serializer_class = PurchaseSerializer
@@ -1518,6 +1533,7 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class EnvironmentVariablesView(APIView):
     """View for managing environment variables from .env file"""
     
@@ -1639,6 +1655,7 @@ class EnvironmentVariablesView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SystemSettingsViewSet(viewsets.ModelViewSet):
     """ViewSet for managing system settings with encryption support"""
     queryset = SystemSettings.objects.all()
