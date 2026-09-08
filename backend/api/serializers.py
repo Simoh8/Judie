@@ -5,7 +5,7 @@ from .models import User, Session, Booking, Review, LeadRequest, Package, Purcha
 
 class UserSerializer(serializers.ModelSerializer):
     firstName = serializers.CharField(source='first_name', required=False)
-    lastName = serializers.CharField(source='last_name', required=False)
+    lastName = serializers.CharField(source='last_name', required=False, allow_blank=True )
     focusHours = serializers.DecimalField(source='focus_hours', read_only=True, max_digits=5, decimal_places=2)
     sessionsJoined = serializers.IntegerField(source='sessions_joined', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
