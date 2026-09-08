@@ -228,7 +228,9 @@ SOCIALACCOUNT_PROVIDERS = {
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 # Settings encryption key for system settings
-SETTINGS_ENCRYPTION_KEY = os.getenv('SETTINGS_ENCRYPTION_KEY', '').encode()
+SETTINGS_ENCRYPTION_KEY = os.getenv('SETTINGS_ENCRYPTION_KEY', None)
+if SETTINGS_ENCRYPTION_KEY:
+    SETTINGS_ENCRYPTION_KEY = SETTINGS_ENCRYPTION_KEY.encode()
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

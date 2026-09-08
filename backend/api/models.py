@@ -268,6 +268,12 @@ class EncryptionManager:
         return key
     
     @staticmethod
+    def is_encryption_configured():
+        """Check if encryption is properly configured"""
+        key = getattr(settings, 'SETTINGS_ENCRYPTION_KEY', None)
+        return bool(key)
+    
+    @staticmethod
     def encrypt(value):
         """Encrypt a value"""
         if not value:

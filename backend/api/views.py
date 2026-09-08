@@ -1670,9 +1670,12 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(category=category)
         
         # Non-admin users can only see public settings
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(is_public=True)
-        elif is_public == 'true':
+        if self.request.user.is_authenticated and self.request.user.is_staff:
+            # Admin users can see all settings unless public=true is specified
+            if is_public == 'true':
+                queryset = queryset.filter(is_public=True)
+        else:
+            # Non-authenticated or non-admin users can only see public settings
             queryset = queryset.filter(is_public=True)
         
         return queryset.order_by('category', 'key')

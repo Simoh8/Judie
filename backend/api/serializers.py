@@ -236,7 +236,11 @@ class SystemSettingsSerializer(serializers.ModelSerializer):
     def get_decryptedValue(self, obj):
         """Return decrypted value for encrypted settings"""
         if obj.is_encrypted:
-            return obj.get_decrypted_value()
+            try:
+                return obj.get_decrypted_value()
+            except Exception as e:
+                # Return the encrypted value if decryption fails
+                return obj.value
         return obj.value
 
 

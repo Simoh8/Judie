@@ -83,7 +83,7 @@ export default function AdminUsersPage() {
       const payload = {
         firstName: userData.firstName,
         lastName: userData.lastName,
-        is_staff: userData.isStaff,
+        isStaff: userData.isStaff,
       };
 
       const response = await fetch(`/api/users/${editingUser.id}/`, {
