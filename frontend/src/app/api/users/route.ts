@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 const BACKEND_URL = process.env.NEXT__BACKEND_URL || 'http://localhost:8000';
 
 function getAuthHeaders(request: NextRequest): HeadersInit {
