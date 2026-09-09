@@ -937,6 +937,32 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = SessionSerializer(sessions, many=True)
         return Response({'success': True, 'sessions': serializer.data})
 
+    @action(detail=False, methods=['get'], permission_classes=[])
+    def me(self, request):
+        """Get current user from token (for auth restoration after payment callback)"""
+        # Try to get user from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.replace('Bearer ', '')
+            try:
+                # Decode JWT token to get user_id
+                import jwt
+                from django.conf import settings
+                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload.get('user_id')
+                
+                if user_id:
+                    user = User.objects.get(id=user_id)
+                    serializer = self.get_serializer(user)
+                    return Response({'success': True, 'user': serializer.data})
+            except (jwt.InvalidTokenError, User.DoesNotExist):
+                pass
+        
+        return Response(
+            {'success': False, 'error': 'Invalid or expired token'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ReviewViewSet(viewsets.ModelViewSet):
@@ -1192,6 +1218,20 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
 
     def list(self, request, *args, **kwargs):
+        # Allow unauthenticated access when filtering by paystack_reference (for callback)
+        paystack_ref = self.request.query_params.get('paystack_reference')
+        if paystack_ref:
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'success': True, 'purchases': serializer.data})
+        
+        # Require authentication for other queries
+        if not request.user.is_authenticated:
+            return Response(
+                {'success': False, 'error': 'Authentication required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response({'success': True, 'purchases': serializer.data})
@@ -1268,6 +1308,9 @@ class PurchaseViewSet(viewsets.ModelViewSet):
             )
         
         try:
+            # Get auth token from request headers if available
+            auth_token = request.META.get('HTTP_AUTHORIZATION', '').replace('Bearer ', '') if request.META.get('HTTP_AUTHORIZATION') else None
+            
             # Generate Paystack payment URL
             payment_url = PaystackService.initiate_payment(
                 email=purchase.user.email,
@@ -1276,7 +1319,10 @@ class PurchaseViewSet(viewsets.ModelViewSet):
                 metadata={
                     'purchase_id': purchase.id,
                     'user_id': purchase.user.id,
-                    'package_id': purchase.package.id
+                    'package_id': purchase.package.id,
+                    'auth_token': auth_token,
+                    'user_email': purchase.user.email,
+                    'user_name': purchase.user.get_full_name()
                 }
             )
             
@@ -1302,9 +1348,9 @@ class PurchaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[])
     def verify_payment(self, request, pk=None):
-        """Verify Paystack payment and update purchase status"""
+        """Verify Paystack payment and update purchase status (no auth required for callback)"""
         purchase = self.get_object()
         reference = request.data.get('reference')
         
@@ -1322,6 +1368,7 @@ class PurchaseViewSet(viewsets.ModelViewSet):
                 # Update purchase status
                 purchase.status = 'completed'
                 purchase.paystack_transaction_id = verification_result.get('transaction_id')
+                purchase.payment_date = timezone.now()
                 purchase.save()
                 
                 return Response({

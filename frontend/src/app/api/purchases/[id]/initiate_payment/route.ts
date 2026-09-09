@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.NEXT__BACKEND_URL || 'http://localhost:8000';
 
+const getAuthHeaders = (request: NextRequest): Record<string, string> => {
+  const authHeader = request.headers.get('authorization');
+  return authHeader ? { Authorization: authHeader } : {};
+};
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -9,7 +14,7 @@ export async function POST(
   try {
     const response = await fetch(`${BACKEND_URL}/api/purchases/${params.id}/initiate_payment/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(request) },
     });
     const data = await response.json();
 

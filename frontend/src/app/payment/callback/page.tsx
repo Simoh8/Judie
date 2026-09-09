@@ -15,6 +15,33 @@ function PaymentCallbackContent() {
   useEffect(() => {
     const verifyPayment = async () => {
       const reference = searchParams.get('reference');
+      const tokenParam = searchParams.get('token');
+      
+      // Restore auth token from URL parameter if available
+      if (tokenParam && typeof window !== 'undefined') {
+        const currentToken = localStorage.getItem('token');
+        // Only restore if token is different to avoid infinite reloads
+        if (currentToken !== tokenParam) {
+          localStorage.setItem('token', tokenParam);
+          // Fetch user data with the new token
+          try {
+            const userResponse = await fetch('/api/users/me', {
+              headers: { Authorization: `Bearer ${tokenParam}` }
+            });
+            if (userResponse.ok) {
+              const userData = await userResponse.json();
+              if (userData.success && userData.user) {
+                localStorage.setItem('user', JSON.stringify(userData.user));
+              }
+            }
+          } catch (error) {
+            console.error('Failed to fetch user data:', error);
+          }
+          // Reload to trigger auth context update
+          window.location.reload();
+          return;
+        }
+      }
       
       if (!reference) {
         setStatus('error');
@@ -23,7 +50,7 @@ function PaymentCallbackContent() {
       }
 
       try {
-        // Find the purchase with this reference
+        // Find the purchase with this reference (no auth required now)
         const response = await fetch(`/api/purchases?paystack_reference=${reference}`);
         const data = await response.json();
         

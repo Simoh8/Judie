@@ -77,10 +77,17 @@ export default function PricingPage() {
     setProcessingPurchase(packageId);
 
     try {
+      // Get auth token
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       // Create purchase record
       const purchaseResponse = await fetch('/api/purchases', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           user: user.id,
           package: packageId
@@ -98,7 +105,8 @@ export default function PricingPage() {
 
         // Initiate payment with Paystack
         const paymentResponse = await fetch(`/api/purchases/${purchaseData.purchase.id}/initiate_payment`, {
-          method: 'POST'
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
 
         const paymentData = await paymentResponse.json();

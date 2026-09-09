@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.NEXT__BACKEND_URL || 'http://localhost:8000';
 
+const getAuthHeaders = (request: NextRequest): Record<string, string> => {
+  const authHeader = request.headers.get('authorization');
+  return authHeader ? { Authorization: authHeader } : {};
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -14,7 +19,9 @@ export async function GET(request: NextRequest) {
     if (status) queryParams.append('status', status);
     if (paystack_reference) queryParams.append('paystack_reference', paystack_reference);
 
-    const response = await fetch(`${BACKEND_URL}/api/purchases/?${queryParams.toString()}`);
+    const response = await fetch(`${BACKEND_URL}/api/purchases/?${queryParams.toString()}`, {
+      headers: getAuthHeaders(request),
+    });
     const data = await response.json();
 
     if (!response.ok) {
@@ -45,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const response = await fetch(`${BACKEND_URL}/api/purchases/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(request) },
       body: JSON.stringify({
         user,
         package: packageId,

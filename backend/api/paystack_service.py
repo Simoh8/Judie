@@ -45,11 +45,16 @@ class PaystackService:
             url = f"{cls.BASE_URL}/transaction/initialize"
             headers = cls.get_headers()
             
+            # Build callback URL with auth token if provided in metadata
+            callback_url = os.getenv('PAYSTACK_CALLBACK_URL', f"{settings.FRONTEND_URL}/payment/callback")
+            if metadata and metadata.get('auth_token'):
+                callback_url = f"{callback_url}?token={metadata.get('auth_token')}"
+            
             payload = {
                 "email": email,
                 "amount": amount_in_naira,
                 "reference": reference,
-                "callback_url": os.getenv('PAYSTACK_CALLBACK_URL', f"{settings.FRONTEND_URL}/payment/callback"),
+                "callback_url": callback_url,
                 "metadata": metadata or {}
             }
             

@@ -40,6 +40,13 @@ export default function AuthModal({
       }
 
       if (success) {
+        // Check if user just completed a payment
+        const paymentSuccess = localStorage.getItem('payment_success');
+        if (paymentSuccess === 'true') {
+          localStorage.removeItem('payment_success');
+          alert('Payment completed successfully! Your package is now active.');
+        }
+        
         onClose();
         setEmail("");
         setPassword("");
