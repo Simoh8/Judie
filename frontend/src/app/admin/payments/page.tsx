@@ -64,7 +64,7 @@ export default function AdminPaymentsPage() {
   });
   const [processing, setProcessing] = useState(false);
 
-  const isAdmin = user?.isStaff || user?.email === 'admin@focused.com';
+  const isAdmin = user?.isStaff || user?.email === 'admin@actuallydoing.com';
 
   const loadPurchases = useCallback(async () => {
     try {

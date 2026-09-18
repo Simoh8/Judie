@@ -31,7 +31,7 @@ export default function AdminUsersPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   // Temporary admin check
-  const isAdmin = user?.isStaff || user?.email === 'admin@focused.com';
+  const isAdmin = user?.isStaff || user?.email === 'admin@actuallydoing.com';
 
   useEffect(() => {
     loadUsers();

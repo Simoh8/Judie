@@ -80,6 +80,20 @@ export default function SessionTypes() {
     }
   };
 
+  const handleLeaveSession = async (sessionId: string) => {
+    if (!user) return;
+
+    setBookingSessionId(sessionId);
+    try {
+      await useSessionStore.getState().cancelBooking(sessionId, user.id);
+      await useSessionStore.getState().loadSessions(true);
+    } catch (error) {
+      console.error("Failed to leave session:", error);
+    } finally {
+      setBookingSessionId(null);
+    }
+  };
+
   if (loading) {
     return (
       <section id="sessions" className="py-24 px-6 bg-gray-50 dark:bg-ios-gray-900/50">
@@ -155,10 +169,11 @@ export default function SessionTypes() {
 
                     {session.isBooked ?? false ? (
                       <button
-                        disabled
-                        className="btn-ios btn-secondary text-sm w-full opacity-50"
+                        onClick={() => handleLeaveSession(session.id)}
+                        disabled={isBooking}
+                        className="btn-ios btn-secondary text-sm w-full disabled:opacity-50"
                       >
-                        Already Joined
+                        {isBooking ? "Leaving..." : "Leave Session"}
                       </button>
                     ) : (
                       <button

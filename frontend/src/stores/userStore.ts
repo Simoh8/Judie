@@ -7,13 +7,14 @@ interface UserStore {
   token: string | null;
   loading: boolean;
   error: string | null;
-  
+
   // Actions
   login: (email: string, password: string) => Promise<boolean>;
   signup: (email: string, name: string, password: string) => Promise<boolean>;
   googleLogin: (email: string, name: string, token: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  setUser: (user: User) => void;
   loadUser: () => void;
   getUserSessions: () => Promise<any[]>;
 }
@@ -116,6 +117,11 @@ export const useUserStore = create<UserStore>((set, get) => ({
     set({ user: null, token: null, error: null });
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+  },
+
+  setUser: (user: User) => {
+    set({ user });
+    localStorage.setItem('user', JSON.stringify(user));
   },
 
   updateUser: async (updates: Partial<User>) => {

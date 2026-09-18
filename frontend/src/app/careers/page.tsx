@@ -26,7 +26,7 @@ export default function CareersPage() {
       location: "Remote",
       type: "Full-time",
       salary: "$100k - $140k",
-      description: "Shape the future of focused work through intuitive design and user-centered thinking.",
+      description: "Shape the future of Actually Doing work through intuitive design and user-centered thinking.",
     },
     {
       title: "Customer Success Manager",
@@ -88,7 +88,7 @@ export default function CareersPage() {
     {
       icon: Users,
       title: "Community Driven",
-      description: "Our decisions are guided by what's best for our community of focused workers.",
+      description: "Our decisions are guided by what's best for our community of Actually Doing workers.",
     },
     {
       icon: Heart,
@@ -106,7 +106,7 @@ export default function CareersPage() {
           {/* Hero Section */}
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
-              Careers at FOCUSED
+              Careers at Actually Doing
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
               Join us in our mission to help millions of people achieve deep focus and meaningful work.

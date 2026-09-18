@@ -102,7 +102,7 @@ export default function AdminSettingsPage() {
   };
 
   // Temporary admin check
-  const isAdmin = user?.isStaff || user?.email === 'admin@focused.com';
+  const isAdmin = user?.isStaff || user?.email === 'admin@actuallydoing.com';
 
   const [newSetting, setNewSetting] = useState({
     key: '',

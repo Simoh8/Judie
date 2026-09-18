@@ -39,7 +39,7 @@ export default function Footer() {
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div className="md:col-span-1">
             <a href="/" className="text-3xl font-bold text-ios-blue mb-4 block">
-              FOCUSED
+              Actually Doing
             </a>
             <p className="text-foreground/60 mb-6">
               Less distraction. More feel-good focus.
@@ -109,10 +109,10 @@ export default function Footer() {
 
         <div className="border-t border-ios-gray-200 dark:border-ios-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-foreground/50 text-sm">
-            © {currentYear} FOCUSED. All rights reserved.
+            © {currentYear} Actually Doing. All rights reserved.
           </p>
           <p className="text-foreground/50 text-sm">
-            Made with ❤️ for focused minds
+            Made with ❤️ for actually doing minds
           </p>
         </div>
       </div>

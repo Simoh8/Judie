@@ -13,7 +13,7 @@ import ReviewModal from "@/components/ReviewModal";
 
 export default function MySessions() {
   const { user } = useAuth();
-  const { getUserSessions, updateUser } = useUserStore();
+  const { getUserSessions, updateUser, setUser } = useUserStore();
   const { cancelBooking, loadUserBookedSessions } = useSessionStore();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,54 +25,58 @@ export default function MySessions() {
   const refreshUserData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const response = await fetch(`/api/users/${user.id}/`);
-      const data = await response.json();
-      if (data.success && data.user) {
-        updateUser(data.user);
+      const response = await api.getUser(user.id.toString());
+      if (response.success && response.user) {
+        setUser(response.user);
       }
     } catch (error) {
       console.error("Failed to refresh user data:", error);
     }
-  }, [user?.id, updateUser]);
+  }, [user?.id, setUser]);
+
+  const fetchSessions = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      // Load user's booked sessions to update the session store
+      await loadUserBookedSessions(user.id);
+      const userSessions = await getUserSessions();
+      // Set isBooked to true for all user sessions since they are the user's booked sessions
+      const sessionsWithBookingStatus = userSessions.map((session: Session) => ({
+        ...session,
+        isBooked: true
+      }));
+      setSessions(sessionsWithBookingStatus);
+
+      // Fetch lead request statuses for each session
+      const statuses: Record<string, string> = {};
+      for (const session of sessionsWithBookingStatus) {
+        try {
+          const response = await fetch(`/api/lead-requests?user=${user.id}&session=${session.id}`);
+          const data = await response.json();
+          if (data.success && data.leadRequests && data.leadRequests.length > 0) {
+            statuses[session.id] = data.leadRequests[0].status;
+          }
+        } catch (error) {
+          console.error(`Failed to fetch lead request for session ${session.id}:`, error);
+        }
+      }
+      setLeadRequestStatuses(statuses);
+    } catch (error) {
+      console.error("Failed to fetch sessions:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, getUserSessions, loadUserBookedSessions]);
 
   useEffect(() => {
-    async function fetchSessions() {
-      if (!user?.id) return;
-
-      try {
-        // Load user's booked sessions to update the session store
-        await loadUserBookedSessions(user.id);
-        const userSessions = await getUserSessions();
-        // Set isBooked to true for all user sessions since they are the user's booked sessions
-        const sessionsWithBookingStatus = userSessions.map((session: Session) => ({
-          ...session,
-          isBooked: true
-        }));
-        setSessions(sessionsWithBookingStatus);
-
-        // Fetch lead request statuses for each session
-        const statuses: Record<string, string> = {};
-        for (const session of sessionsWithBookingStatus) {
-          try {
-            const response = await fetch(`/api/lead-requests?user=${user.id}&session=${session.id}`);
-            const data = await response.json();
-            if (data.success && data.leadRequests && data.leadRequests.length > 0) {
-              statuses[session.id] = data.leadRequests[0].status;
-            }
-          } catch (error) {
-            console.error(`Failed to fetch lead request for session ${session.id}:`, error);
-          }
-        }
-        setLeadRequestStatuses(statuses);
-      } catch (error) {
-        console.error("Failed to fetch sessions:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchSessions();
-  }, [user?.id, getUserSessions, loadUserBookedSessions]);
+  }, [fetchSessions]);
+
+  const handleSessionAction = useCallback(async () => {
+    await refreshUserData();
+    await fetchSessions();
+  }, [refreshUserData, fetchSessions]);
 
   const handleReview = async (rating: number, comment: string) => {
     if (!user?.id || !selectedSession) return;
@@ -92,8 +96,7 @@ export default function MySessions() {
       const data = await response.json();
       if (data.success) {
         // Refresh sessions to update review status
-        const userSessions = await getUserSessions();
-        setSessions(userSessions);
+        await fetchSessions();
       }
     } catch (error) {
       console.error("Failed to submit review:", error);
@@ -162,7 +165,7 @@ export default function MySessions() {
                     showReviewButton={true}
                     onReview={openReviewModal}
                     onRequestToLead={handleRequestToLead}
-                    onSessionAction={refreshUserData}
+                    onSessionAction={handleSessionAction}
                     leadRequestStatus={leadRequestStatuses[session.id]}
                     loadingSessionId={loadingLeadRequest}
                     onLoadingChange={(loading, sessionId) => {

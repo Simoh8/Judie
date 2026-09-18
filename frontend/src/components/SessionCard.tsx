@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useUserStore } from "@/stores/userStore";
 import { Session } from "@/lib/types";
+import { api } from "@/lib/api";
 import { Calendar, Clock, Users, X, Star, Video, Copy, Check, Crown } from "lucide-react";
 
 // Extend Session type with ongoing session properties
@@ -43,7 +44,7 @@ export default function SessionCard({
 }: SessionCardProps) {
   const { user } = useAuth();
   const { bookSession, cancelBooking } = useSessionStore();
-  const { updateUser } = useUserStore();
+  const { updateUser, setUser } = useUserStore();
   const [internalLoading, setInternalLoading] = useState(false);
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
 
@@ -60,10 +61,9 @@ export default function SessionCard({
   const refreshUserData = async () => {
     if (!user?.id) return;
     try {
-      const response = await fetch(`/api/users/${user.id}/`);
-      const data = await response.json();
-      if (data.success && data.user) {
-        updateUser(data.user);
+      const response = await api.getUser(user.id.toString());
+      if (response.success && response.user) {
+        setUser(response.user);
       }
     } catch (error) {
       console.error("Failed to refresh user data:", error);
@@ -77,6 +77,11 @@ export default function SessionCard({
     try {
       await bookSession(session.id, user.id);
       await refreshUserData();
+      // Increment sessionsJoined count locally if needed
+      if (user && typeof user.sessionsJoined === 'number') {
+        const updatedUser = { ...user, sessionsJoined: user.sessionsJoined + 1 };
+        setUser(updatedUser);
+      }
       // Force a re-render by updating the session's isBooked property
       (session as any).isBooked = true;
       // Call parent's session action handler to refresh dashboard data
@@ -97,12 +102,18 @@ export default function SessionCard({
     try {
       await cancelBooking(session.id, user.id);
       await refreshUserData();
+      // Decrement sessionsJoined count locally if needed
+      if (user && typeof user.sessionsJoined === 'number') {
+        const updatedUser = { ...user, sessionsJoined: Math.max(0, user.sessionsJoined - 1) };
+        setUser(updatedUser);
+      }
+      (session as any).isBooked = false;
       // Call parent's session action handler to refresh dashboard data
       if (onSessionAction) {
         await onSessionAction();
       }
     } catch (error) {
-      console.error("Failed to cancel booking:", error);
+      console.error("Failed to leave session:", error);
     } finally {
       setLoading(false);
     }
@@ -144,12 +155,12 @@ export default function SessionCard({
 
   return (
     <div className="card-ios p-6 relative">
-      {showCancelButton && isBooked && session.status === 'scheduled' && (
+      {showCancelButton && isBooked && session.status !== 'completed' && (
         <button
           onClick={handleCancelBooking}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-ios-gray-800 transition-colors"
           disabled={isLoading}
-          title="Cancel booking"
+          title={session.status === 'live' || isOngoingSession ? "Leave session" : "Cancel session"}
         >
           <X size={18} className="text-foreground/60" />
         </button>
@@ -233,13 +244,16 @@ export default function SessionCard({
 
       {isBooked ? (
         <div className="space-y-2 mt-4">
-          {showCancelButton && session.status === 'scheduled' && (
+          {showCancelButton && session.status !== 'completed' && (
             <button
               onClick={handleCancelBooking}
               className="btn-ios btn-secondary text-sm w-full"
               disabled={isLoading}
             >
-              {isLoading ? 'Cancelling...' : 'Cancel Session'}
+              {isLoading 
+                ? (session.status === 'live' || isOngoingSession ? 'Leaving...' : 'Cancelling...') 
+                : (session.status === 'live' || isOngoingSession ? 'Leave Session' : 'Cancel Session')
+              }
             </button>
           )}
           

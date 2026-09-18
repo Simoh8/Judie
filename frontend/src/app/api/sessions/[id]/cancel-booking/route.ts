@@ -2,13 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.NEXT__BACKEND_URL || 'http://localhost:8000';
 
+function getAuthHeaders(request: NextRequest): HeadersInit {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  
+  // Get token from request headers (sent from client)
+  const authHeader = request.headers.get('authorization');
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
+  
+  return headers;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await request.json();
-    const { userId } = body;
+    const userId = body.userId || body.user_id;
 
     if (!userId) {
       return NextResponse.json(
@@ -19,7 +31,7 @@ export async function POST(
 
     const response = await fetch(`${BACKEND_URL}/api/sessions/${params.id}/cancel_booking/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(request),
       body: JSON.stringify({ user_id: userId }),
     });
 

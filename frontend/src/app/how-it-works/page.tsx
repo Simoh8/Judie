@@ -61,7 +61,7 @@ export default function HowItWorksPage() {
           {/* Hero Section */}
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
-              How FOCUSED Works
+              How Actually Doing Works
             </h1>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
               Achieve deep focus in just 4 simple steps. Our science-backed approach helps you build lasting focus habits.
@@ -101,7 +101,7 @@ export default function HowItWorksPage() {
           {/* Features Section */}
           <div className="mb-20">
             <h2 className="text-3xl font-bold text-foreground mb-12 text-center">
-              Why FOCUSED Works
+              Why Actually Doing Works
             </h2>
             <div className="grid md:grid-cols-3 gap-8">
               {features.map((feature, index) => (
@@ -126,7 +126,7 @@ export default function HowItWorksPage() {
               Ready to Transform Your Focus?
             </h2>
             <p className="text-foreground/60 mb-8 max-w-xl mx-auto">
-              Join thousands of professionals who have already discovered the power of focused work sessions.
+              Join thousands of professionals who have already discovered the power of Actually Doing work sessions.
             </p>
             <a
               href="/"

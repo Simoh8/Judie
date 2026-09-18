@@ -12,7 +12,7 @@ interface SessionStore {
   bookedSessionIds: Set<string>;
   
   // Actions
-  loadSessions: () => Promise<void>;
+  loadSessions: (silent?: boolean) => Promise<void>;
   loadUserBookedSessions: (userId: string) => Promise<void>;
   createSession: (sessionData: any) => Promise<void>;
   updateSession: (id: string, sessionData: any) => Promise<void>;
@@ -38,8 +38,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   typeFilter: '',
   bookedSessionIds: new Set<string>(),
 
-  loadSessions: async () => {
-    set({ loading: true, error: null });
+  loadSessions: async (silent = false) => {
+    if (!silent && get().sessions.length === 0) {
+      set({ loading: true, error: null });
+    }
     try {
       const { searchTerm, statusFilter, typeFilter, bookedSessionIds } = get();
       const params: any = {};
@@ -69,8 +71,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (response.success && response.sessions) {
         const bookedIds = new Set(response.sessions.map((s: Session) => s.id));
         set({ bookedSessionIds: bookedIds });
-        // Reload sessions to update isBooked status
-        await get().loadSessions();
+        // Reload sessions silently to update isBooked status
+        await get().loadSessions(true);
       }
     } catch (error) {
       console.error('Failed to load user booked sessions:', error);
@@ -78,7 +80,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   createSession: async (sessionData: any) => {
-    set({ loading: true, error: null });
     try {
       const response = await api.createSession(sessionData);
       if (response.success && response.session) {
@@ -95,7 +96,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   updateSession: async (id: string, sessionData: any) => {
-    set({ loading: true, error: null });
     try {
       const response = await api.updateSession(id, sessionData);
       if (response.success && response.session) {
@@ -112,7 +112,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   deleteSession: async (id: string) => {
-    set({ loading: true, error: null });
     try {
       const response = await api.deleteSession(id);
       if (response.success) {
@@ -129,7 +128,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   startSession: async (id: string) => {
-    set({ loading: true, error: null });
     try {
       const response = await api.startSession(id);
       if (response.success && response.session) {
@@ -146,7 +144,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   endSession: async (id: string) => {
-    set({ loading: true, error: null });
     try {
       const response = await api.endSession(id);
       if (response.success && response.session) {
@@ -163,7 +160,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   regenerateZoom: async (id: string) => {
-    set({ loading: true, error: null });
     try {
       const response = await fetch(`/api/sessions/${id}/regenerate-zoom`, {
         method: 'POST',
@@ -185,71 +181,88 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   bookSession: async (id: string, userId: string) => {
-    set({ loading: true, error: null });
     try {
       const response = await api.bookSession(id, userId);
-      if (response.success) {
-        // Add session to booked set
+      if (response.success || response.error === 'Already booked') {
+        const updatedApiSession = response.session;
         set((state) => {
           const newBookedIds = new Set(state.bookedSessionIds);
           newBookedIds.add(id);
-          return { bookedSessionIds: newBookedIds };
+          const updatedSessions = state.sessions.map((s) => {
+            if (s.id === id) {
+              return {
+                ...(updatedApiSession || s),
+                isBooked: true,
+                currentParticipants: updatedApiSession
+                  ? updatedApiSession.currentParticipants
+                  : Math.min(s.maxParticipants, s.currentParticipants + 1),
+              };
+            }
+            return s;
+          });
+          return {
+            bookedSessionIds: newBookedIds,
+            sessions: updatedSessions,
+          };
         });
-        // Reload sessions to get updated participant count and isBooked status
-        await get().loadSessions();
-        set({ loading: false });
-      } else if (response.error === 'Already booked') {
-        // If already booked, add to booked set and reload
-        set((state) => {
-          const newBookedIds = new Set(state.bookedSessionIds);
-          newBookedIds.add(id);
-          return { bookedSessionIds: newBookedIds };
-        });
-        await get().loadSessions();
-        set({ loading: false });
+        // Background silent sync
+        await get().loadSessions(true);
       } else {
-        set({ error: 'Failed to book session', loading: false });
+        set({ error: 'Failed to book session' });
       }
     } catch (error) {
-      set({ error: 'Failed to book session', loading: false });
+      set({ error: 'Failed to book session' });
     }
   },
 
   cancelBooking: async (id: string, userId: string) => {
-    set({ loading: true, error: null });
     try {
       const response = await api.cancelBooking(id, userId);
       if (response.success) {
-        // Remove session from booked set
+        const updatedApiSession = response.session;
         set((state) => {
           const newBookedIds = new Set(state.bookedSessionIds);
           newBookedIds.delete(id);
-          return { bookedSessionIds: newBookedIds };
+          const updatedSessions = state.sessions.map((s) => {
+            if (s.id === id) {
+              return {
+                ...(updatedApiSession || s),
+                isBooked: false,
+                currentParticipants: updatedApiSession
+                  ? updatedApiSession.currentParticipants
+                  : Math.max(0, s.currentParticipants - 1),
+              };
+            }
+            return s;
+          });
+          return {
+            bookedSessionIds: newBookedIds,
+            sessions: updatedSessions,
+          };
         });
-        // Reload sessions to get updated participant count and isBooked status
-        await get().loadSessions();
-        set({ loading: false });
+        // Background silent sync
+        await get().loadSessions(true);
       } else {
-        set({ error: 'Failed to cancel booking', loading: false });
+        set({ error: 'Failed to cancel booking' });
       }
     } catch (error) {
-      set({ error: 'Failed to cancel booking', loading: false });
+      set({ error: 'Failed to cancel booking' });
     }
   },
 
   setSearchTerm: (term: string) => {
     set({ searchTerm: term });
-    get().loadSessions();
+    get().loadSessions(true);
   },
 
   setStatusFilter: (filter: string) => {
     set({ statusFilter: filter });
-    get().loadSessions();
+    get().loadSessions(true);
   },
 
   setTypeFilter: (filter: string) => {
     set({ typeFilter: filter });
-    get().loadSessions();
+    get().loadSessions(true);
   },
 
   getParticipants: async (id: string) => {

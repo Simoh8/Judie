@@ -5,23 +5,31 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useUserStore } from "@/stores/userStore";
 import { Session } from "@/lib/types";
+import { api } from "@/lib/api";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import SessionCard from "@/components/SessionCard";
+import ReviewModal from "@/components/ReviewModal";
 import { Clock, Users, Calendar, TrendingUp } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { sessions, loading, loadUserBookedSessions } = useSessionStore();
-  const { updateUser } = useUserStore();
+  const { updateUser, getUserSessions, setUser } = useUserStore();
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
+  const [bookedSessions, setBookedSessions] = useState<Session[]>([]);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [leadRequestStatuses, setLeadRequestStatuses] = useState<Record<string, string>>({});
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    useSessionStore.getState().loadSessions();
     if (user?.id) {
+      // loadUserBookedSessions already calls loadSessions internally
       loadUserBookedSessions(user.id);
+    } else {
+      // If no user, just load sessions without booking status
+      useSessionStore.getState().loadSessions();
     }
   }, [user?.id, loadUserBookedSessions]);
 
@@ -29,18 +37,51 @@ export default function Dashboard() {
     setUpcomingSessions(sessions.slice(0, 3));
   }, [sessions]);
 
+  useEffect(() => {
+    async function fetchBookedSessions() {
+      if (!user?.id) return;
+
+      try {
+        await loadUserBookedSessions(user.id);
+        const userSessions = await getUserSessions();
+        const sessionsWithBookingStatus = userSessions.map((session: Session) => ({
+          ...session,
+          isBooked: true
+        }));
+        setBookedSessions(sessionsWithBookingStatus);
+
+        const statuses: Record<string, string> = {};
+        for (const session of sessionsWithBookingStatus) {
+          try {
+            const response = await fetch(`/api/lead-requests?user=${user.id}&session=${session.id}`);
+            const data = await response.json();
+            if (data.success && data.leadRequests && data.leadRequests.length > 0) {
+              statuses[session.id] = data.leadRequests[0].status;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch lead request for session ${session.id}:`, error);
+          }
+        }
+        setLeadRequestStatuses(statuses);
+      } catch (error) {
+        console.error("Failed to fetch booked sessions:", error);
+      }
+    }
+
+    fetchBookedSessions();
+  }, [user?.id, loadUserBookedSessions, getUserSessions]);
+
   const refreshUserData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const response = await fetch(`/api/users/${user.id}/`);
-      const data = await response.json();
-      if (data.success && data.user) {
-        updateUser(data.user);
+      const response = await api.getUser(user.id.toString());
+      if (response.success && response.user) {
+        setUser(response.user);
       }
     } catch (error) {
       console.error("Failed to refresh user data:", error);
     }
-  }, [user?.id, updateUser]);
+  }, [user?.id, setUser]);
 
   const refreshLeadRequests = useCallback(async () => {
     if (!user?.id) return;
@@ -83,7 +124,7 @@ export default function Dashboard() {
         const promises = [
           refreshUserData(),
           refreshLeadRequests(),
-          useSessionStore.getState().loadSessions(),
+          useSessionStore.getState().loadSessions(true),
         ];
         if (user?.id) {
           promises.push(loadUserBookedSessions(user.id));
@@ -105,12 +146,42 @@ export default function Dashboard() {
     const promises = [
       refreshUserData(),
       refreshLeadRequests(),
-      useSessionStore.getState().loadSessions(),
+      useSessionStore.getState().loadSessions(true),
     ];
     if (user?.id) {
       promises.push(loadUserBookedSessions(user.id));
     }
     await Promise.all(promises);
+  };
+
+  const handleReview = async (rating: number, comment: string) => {
+    if (!user?.id || !selectedSession) return;
+
+    try {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session: selectedSession.id,
+          user: user.id,
+          rating,
+          comment,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        const userSessions = await getUserSessions();
+        setBookedSessions(userSessions);
+      }
+    } catch (error) {
+      console.error("Failed to submit review:", error);
+    }
+  };
+
+  const openReviewModal = (session: Session) => {
+    setSelectedSession(session);
+    setReviewModalOpen(true);
   };
 
   return (
@@ -168,7 +239,36 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="animate-slide-up" style={{ animationDelay: "0.5s" }}>
+            {bookedSessions.length > 0 && (
+              <div className="animate-slide-up mb-8" style={{ animationDelay: "0.5s" }}>
+                <h2 className="text-2xl font-bold mb-4 text-foreground">Your Sessions</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {bookedSessions.map((session) => (
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      showCancelButton={true}
+                      showZoomDetails={true}
+                      showReviewButton={true}
+                      onReview={openReviewModal}
+                      onRequestToLead={handleRequestToLead}
+                      onSessionAction={handleSessionAction}
+                      leadRequestStatus={leadRequestStatuses[session.id]}
+                      loadingSessionId={loadingSessionId}
+                      onLoadingChange={(loading, sessionId) => {
+                        if (loading) {
+                          setLoadingSessionId(sessionId);
+                        } else {
+                          setLoadingSessionId(null);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="animate-slide-up" style={{ animationDelay: "0.6s" }}>
               <h2 className="text-2xl font-bold mb-4 text-foreground">Upcoming Sessions</h2>
               {loading ? (
                 <div className="flex items-center justify-center py-12">
@@ -206,6 +306,13 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
+
+      <ReviewModal
+        isOpen={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        onSubmit={handleReview}
+        sessionTitle={selectedSession?.title || ''}
+      />
     </ProtectedRoute>
   );
 }

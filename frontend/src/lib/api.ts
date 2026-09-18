@@ -1,6 +1,6 @@
 import { User, Session, AuthResponse } from "./types";
 
-const API_BASE = `${process.env.NEXT__BACKEND_URL}/api`;
+const API_BASE = "/api";
 
 const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem("token");
@@ -10,7 +10,7 @@ const getAuthHeaders = (): Record<string, string> => {
 export const api = {
   // Auth
   async signup(email: string, name: string, password: string): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE}/auth/signup/`, {
+    const response = await fetch(`${API_BASE}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, name, password }),
@@ -19,7 +19,7 @@ export const api = {
   },
 
   async login(email: string, password: string): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE}/auth/login/`, {
+    const response = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -30,7 +30,7 @@ export const api = {
   async googleLogin(email: string, name: string, token: string): Promise<AuthResponse> {
     // The backend verifies the Google ID token and extracts email/name from it.
     // The `email` and `name` params are fallbacks only (backend ignores them if token is valid).
-    const response = await fetch(`${API_BASE}/auth/google/`, {
+    const response = await fetch(`${API_BASE}/auth/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
@@ -41,54 +41,54 @@ export const api = {
   // Sessions
   async getSessions(params?: { type?: string; upcoming?: boolean }): Promise<{ success: boolean; sessions?: Session[]; error?: string }> {
     const queryString = new URLSearchParams(params as any).toString();
-    const response = await fetch(`${API_BASE}/sessions/${queryString ? `?${queryString}` : ""}`, {
+    const response = await fetch(`${API_BASE}/sessions${queryString ? `?${queryString}` : ""}`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
   async getSession(id: string): Promise<{ success: boolean; session?: Session; error?: string }> {
-    const response = await fetch(`${API_BASE}/sessions/${id}/`, {
+    const response = await fetch(`${API_BASE}/sessions/${id}`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
-  async bookSession(sessionId: string, userId: string): Promise<{ success: boolean; booking?: any; error?: string }> {
-    const response = await fetch(`${API_BASE}/sessions/${sessionId}/book/`, {
+  async bookSession(sessionId: string, userId: string): Promise<{ success: boolean; booking?: any; session?: Session; error?: string }> {
+    const response = await fetch(`${API_BASE}/sessions/${sessionId}/book`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({ userId, user_id: userId }),
     });
     return response.json();
   },
 
-  async cancelBooking(sessionId: string, userId: string): Promise<{ success: boolean; message?: string; error?: string }> {
-    const response = await fetch(`${API_BASE}/sessions/${sessionId}/cancel_booking/`, {
+  async cancelBooking(sessionId: string, userId: string): Promise<{ success: boolean; message?: string; session?: Session; error?: string }> {
+    const response = await fetch(`${API_BASE}/sessions/${sessionId}/cancel-booking`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({ userId, user_id: userId }),
     });
     return response.json();
   },
 
   // Users
   async getUser(id: string): Promise<{ success: boolean; user?: User; error?: string }> {
-    const response = await fetch(`${API_BASE}/users/${id}/`, {
+    const response = await fetch(`${API_BASE}/users/${id}`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
   async getUserSessions(id: string): Promise<{ success: boolean; sessions?: Session[]; error?: string }> {
-    const response = await fetch(`${API_BASE}/users/${id}/sessions/`, {
+    const response = await fetch(`${API_BASE}/users/${id}/sessions`, {
       headers: getAuthHeaders(),
     });
     return response.json();
   },
 
   async updateUser(id: string, updates: Partial<User>): Promise<{ success: boolean; user?: User; error?: string }> {
-    const response = await fetch(`${API_BASE}/users/${id}/`, {
+    const response = await fetch(`${API_BASE}/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(updates),

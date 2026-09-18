@@ -763,10 +763,15 @@ See you there!
         booking.save()
 
         session.current_participants = max(0, session.current_participants - 1)
+        if session.leader_id == user.id:
+            session.leader = None
         session.save()
 
         user.sessions_joined = max(0, user.sessions_joined - 1)
         user.save()
+
+        # Delete any lead requests for this user and session when booking is cancelled
+        LeadRequest.objects.filter(session=session, user=user).delete()
 
         # Return the updated session data
         session_serializer = SessionSerializer(session)

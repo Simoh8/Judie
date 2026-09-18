@@ -33,7 +33,7 @@ const sessionTypeConfig = {
 
 export default function Hero() {
   const { user, loading } = useAuth();
-  const { sessions, loading: sessionsLoading, loadSessions, bookSession } = useSessionStore();
+  const { sessions, loading: sessionsLoading, loadSessions, bookSession, cancelBooking } = useSessionStore();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [bookingSessionId, setBookingSessionId] = useState<string | null>(null);
   const [typedText, setTypedText] = useState("");
@@ -95,6 +95,20 @@ export default function Hero() {
       router.push("/my-sessions");
     } catch (error) {
       console.error("Failed to book session:", error);
+    } finally {
+      setBookingSessionId(null);
+    }
+  };
+
+  const handleLeaveSession = async (sessionId: string) => {
+    if (!user) return;
+
+    setBookingSessionId(sessionId);
+    try {
+      await cancelBooking(sessionId, user.id);
+      await loadSessions(true);
+    } catch (error) {
+      console.error("Failed to leave session:", error);
     } finally {
       setBookingSessionId(null);
     }
@@ -275,10 +289,11 @@ export default function Hero() {
 
                           {session.isBooked ?? false ? (
                             <button
-                              disabled
-                              className="btn-ios btn-secondary text-xs w-full opacity-50"
+                              onClick={() => handleLeaveSession(session.id)}
+                              disabled={isBooking}
+                              className="btn-ios btn-secondary text-xs w-full disabled:opacity-50"
                             >
-                              Already Joined
+                              {isBooking ? "Leaving..." : "Leave Session"}
                             </button>
                           ) : (
                             <button

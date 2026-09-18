@@ -26,7 +26,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       }
 
       // Admins and staff have unrestricted access to app features
-      if (user.isStaff || user.email === 'admin@focused.com') {
+      if (user.isStaff || user.email === 'admin@actuallydoing.com') {
         if (isMounted) {
           setHasAccess(true);
           setCheckingSubscription(false);
@@ -76,7 +76,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     );
   }
 
-  if (!user || (!hasAccess && !(user?.isStaff || user?.email === 'admin@focused.com'))) {
+  if (!user || (!hasAccess && !(user?.isStaff || user?.email === 'admin@actuallydoing.com'))) {
     return null;
   }
 
