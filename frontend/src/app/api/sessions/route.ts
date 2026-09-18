@@ -50,27 +50,44 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, type, duration, scheduledFor, facilitator, maxParticipants, description } = body;
+    const { title, type, duration, scheduledFor, facilitator, maxParticipants, description, isOngoing, regenerateIntervalHours } = body;
 
-    if (!title || !type || !duration || !scheduledFor || !facilitator) {
+    // scheduledFor is only required for non-ongoing sessions
+    const isOngoingSession = type === 'ongoing' || isOngoing;
+    if (!title || !type || !duration || !facilitator || (!isOngoingSession && !scheduledFor)) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
         { status: 400 }
       );
     }
 
+    // The backend serializer expects camelCase field names (with source mapping to snake_case)
+    const requestBody: any = {
+      title,
+      type,
+      duration,
+      facilitator,
+      maxParticipants: maxParticipants || 10,
+      description: description || "",
+    };
+
+    // Only include scheduledFor for non-ongoing sessions
+    if (!isOngoingSession && scheduledFor) {
+      requestBody.scheduledFor = scheduledFor;
+    }
+
+    // Add ongoing session specific fields
+    if (isOngoingSession) {
+      requestBody.isOngoing = true;
+      if (regenerateIntervalHours) {
+        requestBody.regenerateIntervalHours = regenerateIntervalHours;
+      }
+    }
+
     const response = await fetch(`${BACKEND_URL}/api/sessions/`, {
       method: 'POST',
       headers: getAuthHeaders(request),
-      body: JSON.stringify({
-        title,
-        type,
-        duration,
-        scheduled_for: scheduledFor,
-        facilitator,
-        max_participants: maxParticipants || 10,
-        description: description || "",
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
