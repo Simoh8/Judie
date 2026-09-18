@@ -35,21 +35,6 @@ export default function PricingPage() {
     loadPackages();
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedPending = localStorage.getItem('pending_package_id');
-      if (storedPending && user) {
-        localStorage.removeItem('pending_package_id');
-        setPendingPackageId(null);
-        handlePurchase(storedPending);
-      } else if (user && pendingPackageId) {
-        const pkgId = pendingPackageId;
-        setPendingPackageId(null);
-        handlePurchase(pkgId);
-      }
-    }
-  }, [user, pendingPackageId, handlePurchase]);
-
   const loadPackages = async () => {
     try {
       const response = await fetch('/api/packages?active=true');
@@ -127,6 +112,21 @@ export default function PricingPage() {
       setProcessingPurchase(null);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedPending = localStorage.getItem('pending_package_id');
+      if (storedPending && user) {
+        localStorage.removeItem('pending_package_id');
+        setPendingPackageId(null);
+        handlePurchase(storedPending);
+      } else if (user && pendingPackageId) {
+        const pkgId = pendingPackageId;
+        setPendingPackageId(null);
+        handlePurchase(pkgId);
+      }
+    }
+  }, [user, pendingPackageId, handlePurchase]);
 
   const getIconForPackage = (packageName: string) => {
     if (packageName.toLowerCase().includes('basic') || packageName.toLowerCase().includes('free')) return Zap;

@@ -122,14 +122,6 @@ export default function AdminSettingsPage() {
     comment: ''
   });
 
-  useEffect(() => {
-    if (viewMode === 'database') {
-      loadSettings();
-    } else {
-      loadEnvironmentVariables();
-    }
-  }, [activeCategory, viewMode, loadSettings, loadEnvironmentVariables]);
-
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
@@ -181,6 +173,14 @@ export default function AdminSettingsPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (viewMode === 'database') {
+      loadSettings();
+    } else {
+      loadEnvironmentVariables();
+    }
+  }, [activeCategory, viewMode, loadSettings, loadEnvironmentVariables]);
 
   const handleSaveSetting = async (setting: Setting) => {
     try {
