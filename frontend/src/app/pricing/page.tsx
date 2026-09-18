@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Check, Crown, Zap, Building2, ArrowRight, CreditCard, Loader2, AlertCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -48,7 +48,7 @@ export default function PricingPage() {
         handlePurchase(pkgId);
       }
     }
-  }, [user, pendingPackageId]);
+  }, [user, pendingPackageId, handlePurchase]);
 
   const loadPackages = async () => {
     try {
@@ -64,7 +64,7 @@ export default function PricingPage() {
     }
   };
 
-  const handlePurchase = async (packageId: string) => {
+  const handlePurchase = useCallback(async (packageId: string) => {
     if (!user) {
       if (typeof window !== "undefined") {
         localStorage.setItem('pending_package_id', packageId);
@@ -126,7 +126,7 @@ export default function PricingPage() {
     } finally {
       setProcessingPurchase(null);
     }
-  };
+  }, [user]);
 
   const getIconForPackage = (packageName: string) => {
     if (packageName.toLowerCase().includes('basic') || packageName.toLowerCase().includes('free')) return Zap;

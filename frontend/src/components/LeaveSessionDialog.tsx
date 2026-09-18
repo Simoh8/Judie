@@ -72,7 +72,7 @@ export default function LeaveSessionDialog({
         </div>
 
         <p className="text-foreground/70 mb-6">
-          Are you sure you want to {isOngoing ? "leave" : "cancel your booking for"} "{sessionTitle}"?
+          Are you sure you want to {isOngoing ? "leave" : "cancel your booking for"} &ldquo;{sessionTitle}&rdquo;?
         </p>
 
         <div className="space-y-3">

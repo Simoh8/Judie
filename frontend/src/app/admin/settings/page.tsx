@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
@@ -128,9 +128,9 @@ export default function AdminSettingsPage() {
     } else {
       loadEnvironmentVariables();
     }
-  }, [activeCategory, viewMode]);
+  }, [activeCategory, viewMode, loadSettings, loadEnvironmentVariables]);
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -154,9 +154,9 @@ export default function AdminSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCategory]);
 
-  const loadEnvironmentVariables = async () => {
+  const loadEnvironmentVariables = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -180,7 +180,7 @@ export default function AdminSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleSaveSetting = async (setting: Setting) => {
     try {
