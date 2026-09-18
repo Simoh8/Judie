@@ -20,7 +20,7 @@ interface ExtendedSession extends Session {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { sessions, loading, loadUserBookedSessions } = useSessionStore();
   const { updateUser, getUserSessions, setUser } = useUserStore();
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
@@ -182,9 +182,14 @@ export default function Dashboard() {
     if (!user?.id || !selectedSession) return;
 
     try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/reviews', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           session: selectedSession.id,
           user: user.id,
