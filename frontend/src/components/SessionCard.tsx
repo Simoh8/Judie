@@ -7,6 +7,7 @@ import { useUserStore } from "@/stores/userStore";
 import { Session } from "@/lib/types";
 import { api } from "@/lib/api";
 import { Calendar, Clock, Users, X, Star, Video, Copy, Check, Crown } from "lucide-react";
+import LeaveSessionDialog from "@/components/LeaveSessionDialog";
 
 // Extend Session type with ongoing session properties
 interface ExtendedSession extends Session {
@@ -43,10 +44,11 @@ export default function SessionCard({
   onSessionAction,
 }: SessionCardProps) {
   const { user } = useAuth();
-  const { bookSession, cancelBooking } = useSessionStore();
+  const { bookSession, cancelBooking, leaveSession } = useSessionStore();
   const { updateUser, setUser } = useUserStore();
   const [internalLoading, setInternalLoading] = useState(false);
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   const isLoading = externalLoadingId === session.id || internalLoading;
   const isBooked = session.isBooked ?? false;
@@ -95,15 +97,25 @@ export default function SessionCard({
     }
   };
 
-  const handleCancelBooking = async () => {
+  const handleCancelBooking = () => {
     if (!user?.id || isLoading) return;
+    setShowLeaveDialog(true);
+  };
+
+  const handleConfirmLeave = async () => {
+    if (!user?.id) return;
 
     setLoading(true);
     try {
-      await cancelBooking(session.id, user.id);
+      // Use leaveSession for ongoing sessions, cancelBooking for scheduled sessions
+      if (session.isOngoing || session.status === 'live') {
+        await leaveSession(session.id, user.id);
+      } else {
+        await cancelBooking(session.id, user.id);
+      }
       await refreshUserData();
-      // Decrement sessionsJoined count locally if needed
-      if (user && typeof user.sessionsJoined === 'number') {
+      // Decrement sessionsJoined count locally if needed (only for cancellations)
+      if (user && typeof user.sessionsJoined === 'number' && !session.isOngoing && session.status !== 'live') {
         const updatedUser = { ...user, sessionsJoined: Math.max(0, user.sessionsJoined - 1) };
         setUser(updatedUser);
       }
@@ -118,6 +130,8 @@ export default function SessionCard({
       setLoading(false);
     }
   };
+
+
 
   const formatTime = (date: Date | string) => {
     const d = new Date(date);
@@ -304,6 +318,16 @@ export default function SessionCard({
           Review Session
         </button>
       )}
+
+      <LeaveSessionDialog
+        isOpen={showLeaveDialog}
+        onClose={() => setShowLeaveDialog(false)}
+        onConfirm={handleConfirmLeave}
+        onReview={onReview}
+        sessionTitle={session.title}
+        isOngoing={isOngoingSession}
+        session={session}
+      />
     </div>
   );
 }

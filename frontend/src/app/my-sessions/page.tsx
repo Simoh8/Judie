@@ -11,6 +11,13 @@ import Navbar from "@/components/Navbar";
 import SessionCard from "@/components/SessionCard";
 import ReviewModal from "@/components/ReviewModal";
 
+// Extend Session type with ongoing session properties
+interface ExtendedSession extends Session {
+  isOngoing?: boolean;
+  lastRegeneratedAt?: string | null;
+  regenerateIntervalHours?: number;
+}
+
 export default function MySessions() {
   const { user } = useAuth();
   const { getUserSessions, updateUser, setUser } = useUserStore();
@@ -41,8 +48,16 @@ export default function MySessions() {
       // Load user's booked sessions to update the session store
       await loadUserBookedSessions(user.id);
       const userSessions = await getUserSessions();
+      // Filter out past sessions (ongoing sessions are always included)
+      const now = new Date();
+      const futureSessions = userSessions.filter((session: Session) => {
+        const extendedSession = session as ExtendedSession;
+        if (extendedSession.isOngoing) return true;
+        const scheduledDate = new Date(session.scheduledFor);
+        return scheduledDate > now;
+      });
       // Set isBooked to true for all user sessions since they are the user's booked sessions
-      const sessionsWithBookingStatus = userSessions.map((session: Session) => ({
+      const sessionsWithBookingStatus = futureSessions.map((session: Session) => ({
         ...session,
         isBooked: true
       }));

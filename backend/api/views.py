@@ -398,6 +398,7 @@ class SessionViewSet(viewsets.ModelViewSet):
         upcoming = self.request.query_params.get('upcoming')
         status_filter = self.request.query_params.get('status')
         search = self.request.query_params.get('search')
+        include_past = self.request.query_params.get('include_past') == 'true'
 
         if session_type:
             queryset = queryset.filter(type=session_type)
@@ -418,6 +419,13 @@ class SessionViewSet(viewsets.ModelViewSet):
                 description__icontains=search
             ) | queryset.filter(
                 facilitator__icontains=search
+            )
+
+        # By default, filter out past sessions unless explicitly requested
+        # Ongoing sessions are always included regardless of date
+        if not include_past:
+            queryset = queryset.filter(
+                models.Q(scheduled_for__gt=timezone.now()) | models.Q(is_ongoing=True)
             )
 
         return queryset.order_by('-scheduled_for')
@@ -747,6 +755,7 @@ See you there!
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def cancel_booking(self, request, pk=None):
+        """Cancel a booking for a scheduled session (before it starts)"""
         session = self.get_object()
         user_id = request.data.get('user_id')
 
@@ -771,6 +780,54 @@ See you there!
         user.save()
 
         # Delete any lead requests for this user and session when booking is cancelled
+        LeadRequest.objects.filter(session=session, user=user).delete()
+
+        # Return the updated session data
+        session_serializer = SessionSerializer(session)
+        return Response({'success': True, 'session': session_serializer.data})
+
+    @action(detail=True, methods=['post'])
+    @transaction.atomic
+    def leave_session(self, request, pk=None):
+        """Leave an ongoing or completed session (marks as completed for review purposes)"""
+        session = self.get_object()
+        user_id = request.data.get('user_id')
+
+        try:
+            user = User.objects.get(id=user_id)
+            # Look for confirmed booking, or allow re-leaving a completed booking
+            booking = Booking.objects.filter(session=session, user=user, status__in=['confirmed', 'completed']).first()
+            if not booking:
+                return Response(
+                    {'success': False, 'error': 'Booking not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        except User.DoesNotExist:
+            return Response(
+                {'success': False, 'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Store original status to check if we need to update focus hours
+        was_already_completed = booking.status == 'completed'
+
+        # Mark booking as completed (user attended/participated)
+        booking.status = 'completed'
+        booking.save()
+
+        session.current_participants = max(0, session.current_participants - 1)
+        if session.leader_id == user.id:
+            session.leader = None
+        session.save()
+
+        # Update focus hours for the user (only if not already completed)
+        if not was_already_completed:
+            from decimal import Decimal
+            focus_hours = Decimal(session.duration) / Decimal(60)
+            user.focus_hours += focus_hours
+            user.save()
+
+        # Delete any lead requests for this user and session
         LeadRequest.objects.filter(session=session, user=user).delete()
 
         # Return the updated session data
@@ -974,6 +1031,11 @@ class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
 
+    def get_permissions(self):
+        if self.action == 'list' or self.action == 'retrieve':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
     def get_serializer_class(self):
         if self.action == 'create':
             return ReviewCreateSerializer
@@ -995,10 +1057,11 @@ class ReviewViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Verify user participated in the session
+        # Verify user participated in the session (must have completed/attended)
         session = serializer.validated_data['session']
         user = serializer.validated_data['user']
         
+        # Only allow reviews for completed bookings (user actually attended/participated)
         if not Booking.objects.filter(session=session, user=user, status='completed').exists():
             return Response(
                 {'success': False, 'error': 'User must have completed the session to review it'},

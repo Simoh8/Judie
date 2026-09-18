@@ -50,7 +50,7 @@ export default function Testimonials() {
       try {
         const response = await fetch('/api/reviews');
         const data = await response.json();
-        if (data.success && data.reviews.length > 0) {
+        if (data.success && data.reviews && data.reviews.length > 0) {
           setReviews(data.reviews);
         }
       } catch (error) {
@@ -63,7 +63,9 @@ export default function Testimonials() {
     fetchReviews();
   }, []);
 
-  const displayReviews = reviews.length > 0 ? reviews.map(review => ({
+  const displayReviews = reviews.length > 0 ? reviews
+    .filter(review => review.comment && review.comment.trim().length > 0)
+    .map(review => ({
     name: `${review.user.firstName} ${review.user.lastName}`,
     role: "Community Member",
     content: review.comment,

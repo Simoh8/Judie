@@ -12,7 +12,7 @@ interface SessionStore {
   bookedSessionIds: Set<string>;
   
   // Actions
-  loadSessions: (silent?: boolean) => Promise<void>;
+  loadSessions: (silent?: boolean, includePast?: boolean) => Promise<void>;
   loadUserBookedSessions: (userId: string) => Promise<void>;
   createSession: (sessionData: any) => Promise<void>;
   updateSession: (id: string, sessionData: any) => Promise<void>;
@@ -22,6 +22,7 @@ interface SessionStore {
   regenerateZoom: (id: string) => Promise<void>;
   bookSession: (id: string, userId: string) => Promise<void>;
   cancelBooking: (id: string, userId: string) => Promise<void>;
+  leaveSession: (id: string, userId: string) => Promise<void>;
   setSearchTerm: (term: string) => void;
   setStatusFilter: (filter: string) => void;
   setTypeFilter: (filter: string) => void;
@@ -38,7 +39,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   typeFilter: '',
   bookedSessionIds: new Set<string>(),
 
-  loadSessions: async (silent = false) => {
+  loadSessions: async (silent = false, includePast = false) => {
     if (!silent && get().sessions.length === 0) {
       set({ loading: true, error: null });
     }
@@ -48,6 +49,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (searchTerm) params.search = searchTerm;
       if (statusFilter) params.status = statusFilter;
       if (typeFilter) params.type = typeFilter;
+      if (includePast) params.include_past = 'true';
 
       const response = await api.getSessions(params);
       if (response.success && response.sessions) {
@@ -247,6 +249,47 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     } catch (error) {
       set({ error: 'Failed to cancel booking' });
+    }
+  },
+
+  leaveSession: async (id: string, userId: string) => {
+    try {
+      const response = await fetch(`/api/sessions/${id}/leave-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        const updatedApiSession = data.session;
+        set((state) => {
+          const newBookedIds = new Set(state.bookedSessionIds);
+          newBookedIds.delete(id);
+          const updatedSessions = state.sessions.map((s) => {
+            if (s.id === id) {
+              return {
+                ...(updatedApiSession || s),
+                isBooked: false,
+                currentParticipants: updatedApiSession
+                  ? updatedApiSession.currentParticipants
+                  : Math.max(0, s.currentParticipants - 1),
+              };
+            }
+            return s;
+          });
+          return {
+            bookedSessionIds: newBookedIds,
+            sessions: updatedSessions,
+          };
+        });
+        // Background silent sync
+        await get().loadSessions(true);
+      } else {
+        set({ error: 'Failed to leave session' });
+      }
+    } catch (error) {
+      set({ error: 'Failed to leave session' });
     }
   },
 

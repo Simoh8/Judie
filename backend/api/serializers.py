@@ -60,6 +60,12 @@ class SessionSerializer(serializers.ModelSerializer):
             # Set scheduled_for to now if not provided
             if not attrs.get('scheduled_for'):
                 attrs['scheduled_for'] = timezone.now()
+        else:
+            # For non-ongoing sessions, validate that scheduled_for is not in the past
+            scheduled_for = attrs.get('scheduled_for')
+            if scheduled_for:
+                if scheduled_for < timezone.now():
+                    raise serializers.ValidationError({'scheduledFor': 'Cannot create sessions for past dates'})
         return attrs
 
 

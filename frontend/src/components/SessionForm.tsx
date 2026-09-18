@@ -41,6 +41,17 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData, is
     setLoading(true);
 
     try {
+      // Validate that scheduledFor is not in the past for non-ongoing sessions
+      if (!(formData.type === 'ongoing' || isOngoing) && formData.scheduledFor) {
+        const scheduledDate = new Date(formData.scheduledFor);
+        const now = new Date();
+        if (scheduledDate < now) {
+          setError("Cannot create sessions for past dates");
+          setLoading(false);
+          return;
+        }
+      }
+
       // For ongoing sessions, ensure isOngoing is set
       const submitData = {
         ...formData,
@@ -171,6 +182,7 @@ export default function SessionForm({ isOpen, onClose, onSubmit, initialData, is
                 className="w-full px-4 py-3 rounded-xl border border-ios-gray-200 dark:border-ios-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-ios-blue text-foreground"
                 required={formData.type !== 'ongoing' && !isOngoing}
                 disabled={formData.type === 'ongoing' || isOngoing}
+                min={new Date().toISOString().slice(0, 16)}
               />
               {(formData.type === 'ongoing' || isOngoing) && (
                 <p className="text-xs text-foreground/60 mt-1">

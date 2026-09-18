@@ -44,6 +44,7 @@ export default function AdminSessionsPage() {
   const [selectedSession, setSelectedSession] = useState<ExtendedSession | null>(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
+  const [includePastSessions, setIncludePastSessions] = useState(true);
 
   const isAdmin = user?.isStaff;
 
@@ -55,13 +56,14 @@ export default function AdminSessionsPage() {
   useEffect(() => {
     loadStats();
     // Initial load of sessions
-    useSessionStore.getState().loadSessions();
-  }, [loadStats]);
+    useSessionStore.getState().loadSessions(false, includePastSessions);
+  }, [loadStats, includePastSessions]);
 
   const handleCreateSession = async (sessionData: any) => {
     try {
       await createSession(sessionData);
       loadStats();
+      useSessionStore.getState().loadSessions(false, includePastSessions);
     } catch (error) {
       console.error("Create session error:", error);
       throw error;
@@ -73,6 +75,7 @@ export default function AdminSessionsPage() {
     try {
       await updateSession(editingSession.id.toString(), sessionData);
       setEditingSession(null);
+      useSessionStore.getState().loadSessions(false, includePastSessions);
     } catch (error) {
       console.error("Update session error:", error);
       throw error;
@@ -84,6 +87,7 @@ export default function AdminSessionsPage() {
     try {
       await deleteSession(sessionId);
       loadStats();
+      useSessionStore.getState().loadSessions(false, includePastSessions);
     } catch (error) {
       console.error("Delete session error:", error);
     }
@@ -93,6 +97,7 @@ export default function AdminSessionsPage() {
     try {
       await startSession(sessionId);
       loadStats();
+      useSessionStore.getState().loadSessions(false, includePastSessions);
     } catch (error) {
       console.error("Start session error:", error);
     }
@@ -102,6 +107,7 @@ export default function AdminSessionsPage() {
     try {
       await endSession(sessionId);
       loadStats();
+      useSessionStore.getState().loadSessions(false, includePastSessions);
     } catch (error) {
       console.error("End session error:", error);
     }
@@ -255,6 +261,15 @@ export default function AdminSessionsPage() {
                   <option value="marathon">Marathon</option>
                   <option value="ongoing">Ongoing Call</option>
                 </select>
+                <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-ios-gray-200 dark:border-ios-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includePastSessions}
+                    onChange={(e) => setIncludePastSessions(e.target.checked)}
+                    className="rounded focus:ring-2 focus:ring-ios-blue"
+                  />
+                  <span className="text-sm text-foreground">Include Past Sessions</span>
+                </label>
               </div>
             </div>
           </div>

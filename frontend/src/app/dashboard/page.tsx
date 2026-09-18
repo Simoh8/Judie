@@ -12,6 +12,13 @@ import SessionCard from "@/components/SessionCard";
 import ReviewModal from "@/components/ReviewModal";
 import { Clock, Users, Calendar, TrendingUp } from "lucide-react";
 
+// Extend Session type with ongoing session properties
+interface ExtendedSession extends Session {
+  isOngoing?: boolean;
+  lastRegeneratedAt?: string | null;
+  regenerateIntervalHours?: number;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { sessions, loading, loadUserBookedSessions } = useSessionStore();
@@ -34,7 +41,15 @@ export default function Dashboard() {
   }, [user?.id, loadUserBookedSessions]);
 
   useEffect(() => {
-    setUpcomingSessions(sessions.slice(0, 3));
+    // Filter out past sessions (ongoing sessions are always included)
+    const now = new Date();
+    const futureSessions = sessions.filter(session => {
+      const extendedSession = session as ExtendedSession;
+      if (extendedSession.isOngoing) return true;
+      const scheduledDate = new Date(session.scheduledFor);
+      return scheduledDate > now;
+    });
+    setUpcomingSessions(futureSessions.slice(0, 3));
   }, [sessions]);
 
   useEffect(() => {
@@ -44,7 +59,16 @@ export default function Dashboard() {
       try {
         await loadUserBookedSessions(user.id);
         const userSessions = await getUserSessions();
-        const sessionsWithBookingStatus = userSessions.map((session: Session) => ({
+        // Filter out past sessions (ongoing and live sessions are always included)
+        const now = new Date();
+        const futureSessions = userSessions.filter((session: Session) => {
+          const extendedSession = session as ExtendedSession;
+          // Include ongoing sessions or live sessions
+          if (extendedSession.isOngoing || session.status === 'live') return true;
+          const scheduledDate = new Date(session.scheduledFor);
+          return scheduledDate > now;
+        });
+        const sessionsWithBookingStatus = futureSessions.map((session: Session) => ({
           ...session,
           isBooked: true
         }));
