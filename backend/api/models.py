@@ -352,3 +352,92 @@ class SystemSettings(models.Model):
         ordering = ['category', 'key']
         verbose_name_plural = "System Settings"
 
+
+class PaymentMethod(models.Model):
+    """Model for storing user payment methods"""
+    
+    PAYMENT_TYPE_CHOICES = [
+        ('card', 'Credit/Debit Card'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('paypal', 'PayPal'),
+        ('other', 'Other'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payment_methods')
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES, default='card')
+    
+    # Card details (encrypted or tokenized)
+    card_last4 = models.CharField(max_length=4, blank=True, null=True, help_text="Last 4 digits of card")
+    card_expiry_month = models.CharField(max_length=2, blank=True, null=True, help_text="Card expiry month (MM)")
+    card_expiry_year = models.CharField(max_length=4, blank=True, null=True, help_text="Card expiry year (YYYY)")
+    card_brand = models.CharField(max_length=20, blank=True, null=True, help_text="Card brand (visa, mastercard, etc.)")
+    
+    # Payment processor tokens
+    paystack_auth_code = models.CharField(max_length=255, blank=True, null=True, help_text="Paystack authorization code")
+    paystack_token = models.CharField(max_length=255, blank=True, null=True, help_text="Paystack payment token")
+    
+    # Metadata
+    is_default = models.BooleanField(default=False, help_text="Whether this is the default payment method")
+    is_active = models.BooleanField(default=True, help_text="Whether this payment method is active")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        if self.payment_type == 'card' and self.card_last4:
+            return f"{self.user.email} - {self.card_brand or 'Card'} •••• {self.card_last4}"
+        return f"{self.user.email} - {self.get_payment_type_display()}"
+    
+    class Meta:
+        ordering = ['-is_default', '-created_at']
+        verbose_name_plural = "Payment Methods"
+
+
+class UserActivity(models.Model):
+    """Model to track all user activities for subscription management and analytics"""
+    
+    ACTIVITY_TYPES = [
+        ('session_booking', 'Session Booking'),
+        ('session_cancellation', 'Session Cancellation'),
+        ('session_completion', 'Session Completion'),
+        ('lead_request', 'Lead Request'),
+        ('lead_request_approved', 'Lead Request Approved'),
+        ('lead_request_rejected', 'Lead Request Rejected'),
+        ('purchase', 'Purchase'),
+        ('subscription_renewal', 'Subscription Renewal'),
+        ('subscription_expiry', 'Subscription Expiry'),
+        ('login', 'User Login'),
+        ('profile_update', 'Profile Update'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activities')
+    activity_type = models.CharField(max_length=50, choices=ACTIVITY_TYPES)
+    
+    # Related objects (optional)
+    session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
+    purchase = models.ForeignKey(Purchase, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
+    lead_request = models.ForeignKey(LeadRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
+    
+    # Activity details
+    description = models.TextField(blank=True, help_text="Detailed description of the activity")
+    metadata = models.JSONField(default=dict, blank=True, help_text="Additional activity data as JSON")
+    
+    # Usage tracking
+    sessions_consumed = models.IntegerField(default=0, help_text="Number of session credits consumed")
+    lead_requests_consumed = models.IntegerField(default=0, help_text="Number of lead request credits consumed")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.get_activity_type_display()} - {self.created_at}"
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "User Activities"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['activity_type', '-created_at']),
+            models.Index(fields=['created_at']),
+        ]
+

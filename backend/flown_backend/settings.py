@@ -160,7 +160,7 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = BASE_DIR / 'backend' / 'media'
 
 STORAGES = {
     "default": {
@@ -233,16 +233,23 @@ if SETTINGS_ENCRYPTION_KEY:
     SETTINGS_ENCRYPTION_KEY = SETTINGS_ENCRYPTION_KEY.encode()
 
 # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+if EMAIL_HOST_USER:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@flown.com')
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@flown.com')
 
-# Crontab settings for ongoing session regeneration
+# Crontab settings for ongoing session regeneration and subscription reminders
 CRONJOBS = [
     ('0 * * * *', 'django.core.management.call_command', ['regenerate_ongoing_sessions'], {}, '>> /tmp/ongoing_sessions_cron.log'),
+    # Subscription reminder cron jobs - send reminders at different intervals
+    ('0 9 * * *', 'django.core.management.call_command', ['send_subscription_reminders', '--days=7'], {}, '>> /tmp/subscription_reminders_7days.log'),
+    ('0 9 * * *', 'django.core.management.call_command', ['send_subscription_reminders', '--days=3'], {}, '>> /tmp/subscription_reminders_3days.log'),
+    ('0 9 * * *', 'django.core.management.call_command', ['send_subscription_reminders', '--days=1'], {}, '>> /tmp/subscription_reminders_1day.log'),
 ]

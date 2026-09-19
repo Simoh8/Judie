@@ -6,7 +6,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight, Crown, Check, X, DollarSign, Settings } from "lucide-react";
+import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight, Crown, Check, X, DollarSign, Settings, BarChart3 } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
@@ -178,7 +178,7 @@ export default function AdminDashboardPage() {
               {/* Quick Actions */}
               <div className="bg-white dark:bg-ios-gray-800 rounded-2xl p-6 shadow-sm mb-8">
                 <h2 className="text-xl font-semibold text-foreground mb-4">Quick Actions</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
                   <a
                     href="/admin/sessions"
                     className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
@@ -254,6 +254,22 @@ export default function AdminDashboardPage() {
                       <div>
                         <div className="font-medium text-foreground">System Settings</div>
                         <div className="text-sm text-foreground/60">Manage app configuration and API keys</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="text-foreground/40" size={20} />
+                  </a>
+
+                  <a
+                    href="/admin/activity"
+                    className="flex items-center justify-between p-4 bg-ios-gray-50 dark:bg-ios-gray-700 rounded-xl hover:bg-ios-gray-100 dark:hover:bg-ios-gray-600 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                        <BarChart3 className="text-indigo-600 dark:text-indigo-300" size={20} />
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">Activity Monitoring</div>
+                        <div className="text-sm text-foreground/60">Track user activities and subscription usage</div>
                       </div>
                     </div>
                     <ArrowRight className="text-foreground/40" size={20} />

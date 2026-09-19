@@ -17,11 +17,14 @@ import re
 import jwt
 import requests as http_requests
 from pathlib import Path
-from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase, SystemSettings
-from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer, PackageSerializer, PackageCreateSerializer, PurchaseSerializer, PurchaseCreateSerializer, PurchaseReconciliationSerializer, SystemSettingsSerializer, SystemSettingsCreateSerializer, SystemSettingsUpdateSerializer
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
+from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase, SystemSettings, PaymentMethod, UserActivity
+from .serializers import UserSerializer, SessionSerializer, BookingSerializer, BookingCreateSerializer, ReviewSerializer, ReviewCreateSerializer, LeadRequestSerializer, LeadRequestCreateSerializer, PackageSerializer, PackageCreateSerializer, PurchaseSerializer, PurchaseCreateSerializer, PurchaseReconciliationSerializer, SystemSettingsSerializer, SystemSettingsCreateSerializer, SystemSettingsUpdateSerializer, PaymentMethodSerializer, PaymentMethodCreateSerializer, UserActivitySerializer
 from .zoom_service import ZoomService
 from .email_service import EmailService
 from .paystack_service import PaystackService
+from .subscription_service import SubscriptionService
 import json
 
 
@@ -484,6 +487,14 @@ class SessionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        # Check subscription limits before booking
+        has_availability, availability_message = SubscriptionService.check_session_availability(user)
+        if not has_availability:
+            return Response(
+                {'success': False, 'error': availability_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         # Lock the session row to prevent race conditions
         session = Session.objects.select_for_update().get(pk=session.pk)
 
@@ -500,6 +511,9 @@ class SessionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Get active purchase for tracking
+        purchase = SubscriptionService.get_active_purchase(user)
+
         # Reuse cancelled booking if exists, otherwise create new
         booking = Booking.objects.filter(session=session, user=user).first()
         if booking:
@@ -515,6 +529,9 @@ class SessionViewSet(viewsets.ModelViewSet):
             user.save()
         session.current_participants += 1
         session.save()
+
+        # Record the booking activity and update usage
+        SubscriptionService.record_session_booking(user, session, purchase)
 
         # Send email with Zoom details
         if session.zoom_join_url:
@@ -737,16 +754,23 @@ See you there!
 </body>
 </html>
 '''
-                send_mail(
-                    subject,
-                    message,
-                    getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@flown.com'),
-                    [user.email],
-                    html_message=html_message,
-                    fail_silently=True,
-                )
+                import threading
+                def _send_booking_email():
+                    try:
+                        send_mail(
+                            subject,
+                            message,
+                            getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@flown.com'),
+                            [user.email],
+                            html_message=html_message,
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        print(f"Failed to send Zoom details email: {e}")
+
+                threading.Thread(target=_send_booking_email, daemon=True).start()
             except Exception as e:
-                print(f"Failed to send Zoom details email: {e}")
+                print(f"Failed to dispatch Zoom details email thread: {e}")
 
         # Return the updated session data instead of booking data
         session_serializer = SessionSerializer(session)
@@ -781,6 +805,10 @@ See you there!
 
         # Delete any lead requests for this user and session when booking is cancelled
         LeadRequest.objects.filter(session=session, user=user).delete()
+
+        # Record the cancellation activity and revert usage
+        purchase = SubscriptionService.get_active_purchase(user)
+        SubscriptionService.record_session_cancellation(user, session, purchase)
 
         # Return the updated session data
         session_serializer = SessionSerializer(session)
@@ -858,6 +886,9 @@ See you there!
             booking.user.focus_hours += focus_hours
             booking.user.save()
             booking.save()
+            
+            # Record session completion activity
+            SubscriptionService.record_session_completion(booking.user, session)
 
         serializer = self.get_serializer(session)
         return Response({'success': True, 'session': serializer.data})
@@ -999,6 +1030,90 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = SessionSerializer(sessions, many=True)
         return Response({'success': True, 'sessions': serializer.data})
 
+    @action(detail=True, methods=['get'])
+    @permission_classes([permissions.IsAdminUser])
+    def activity_log(self, request, pk=None):
+        """Get activity log for a specific user (admin only)"""
+        user = self.get_object()
+        limit = int(request.query_params.get('limit', 50))
+        
+        activities = SubscriptionService.get_user_activity_log(user, limit)
+        
+        activity_data = []
+        for activity in activities:
+            activity_data.append({
+                'id': activity.id,
+                'activity_type': activity.activity_type,
+                'description': activity.description,
+                'created_at': activity.created_at,
+                'sessions_consumed': activity.sessions_consumed,
+                'lead_requests_consumed': activity.lead_requests_consumed,
+                'metadata': activity.metadata,
+                'session_title': activity.session.title if activity.session else None,
+                'package_name': activity.purchase.package.name if activity.purchase else None,
+            })
+        
+        return Response({
+            'success': True,
+            'activities': activity_data,
+            'user': user.email
+        })
+
+    @action(detail=True, methods=['get'])
+    @permission_classes([permissions.IsAdminUser])
+    def usage_summary(self, request, pk=None):
+        """Get usage summary for a specific user (admin only)"""
+        user = self.get_object()
+        summary = SubscriptionService.get_user_usage_summary(user)
+        
+        return Response({
+            'success': True,
+            'usage': summary,
+            'user': user.email
+        })
+
+    @action(detail=False, methods=['get'])
+    @permission_classes([permissions.IsAdminUser])
+    def all_activities(self, request):
+        """Get all recent activities across all users (admin only)"""
+        limit = int(request.query_params.get('limit', 100))
+        activity_type = request.query_params.get('activity_type')
+        
+        activities = UserActivity.objects.all().select_related(
+            'user', 'session', 'purchase', 'lead_request'
+        ).order_by('-created_at')
+        
+        if activity_type:
+            activities = activities.filter(activity_type=activity_type)
+        
+        activities = activities[:limit]
+        
+        activity_data = []
+        for activity in activities:
+            user_display_name = f"{activity.user.first_name} {activity.user.last_name}".strip() if (activity.user.first_name or activity.user.last_name) else activity.user.username
+            activity_data.append({
+                'id': activity.id,
+                'user_id': activity.user.id,
+                'user_name': user_display_name,
+                'user_email': activity.user.email,
+                'activity_type': activity.activity_type,
+                'description': activity.description,
+                'created_at': activity.created_at,
+                'sessions_consumed': activity.sessions_consumed,
+                'lead_requests_consumed': activity.lead_requests_consumed,
+                'metadata': activity.metadata,
+                'session_id': activity.session.id if activity.session else None,
+                'session_title': activity.session.title if activity.session else None,
+                'purchase_id': activity.purchase.id if activity.purchase else None,
+                'package_name': activity.purchase.package.name if (activity.purchase and activity.purchase.package) else None,
+                'lead_request_id': activity.lead_request.id if activity.lead_request else None,
+            })
+        
+        return Response({
+            'success': True,
+            'activities': activity_data
+        })
+
     @action(detail=False, methods=['get'], permission_classes=[])
     def me(self, request):
         """Get current user from token (for auth restoration after payment callback)"""
@@ -1013,17 +1128,22 @@ class UserViewSet(viewsets.ModelViewSet):
                 payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
                 user_id = payload.get('user_id')
                 
-                if user_id:
-                    user = User.objects.get(id=user_id)
-                    serializer = self.get_serializer(user)
-                    return Response({'success': True, 'user': serializer.data})
-            except (jwt.InvalidTokenError, User.DoesNotExist):
-                pass
+                user = User.objects.get(id=user_id)
+                serializer = UserSerializer(user)
+                return Response({'success': True, 'user': serializer.data})
+            except (jwt.DecodeError, User.DoesNotExist):
+                return Response({'success': False, 'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
         
-        return Response(
-            {'success': False, 'error': 'Invalid or expired token'},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
+        return Response({'success': False, 'error': 'No token provided'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    @action(detail=False, methods=['get'])
+    def my_usage(self, request):
+        """Get current user's subscription usage summary"""
+        if not request.user.is_authenticated:
+            return Response({'success': False, 'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        summary = SubscriptionService.get_user_usage_summary(request.user)
+        return Response({'success': True, 'usage': summary})
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -1136,7 +1256,19 @@ class LeadRequestViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Check subscription limits before creating lead request
+        has_availability, availability_message = SubscriptionService.check_lead_request_availability(user)
+        if not has_availability:
+            return Response(
+                {'success': False, 'error': availability_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         self.perform_create(serializer)
+        
+        # Record the lead request activity and update usage
+        purchase = SubscriptionService.get_active_purchase(user)
+        SubscriptionService.record_lead_request(user, session, serializer.instance, purchase)
         
         # Send email notification to admin
         try:
@@ -1153,16 +1285,23 @@ Session Details:
 
 You can approve or reject this request in the admin dashboard.
 '''
-            send_mail(
-                subject,
-                message,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@flown.com'),
-                [admin_email],
-                fail_silently=True,
-            )
+            import threading
+            def _send_lead_email():
+                try:
+                    send_mail(
+                        subject,
+                        message,
+                        getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@flown.com'),
+                        [admin_email],
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    print(f"Failed to send email notification: {e}")
+
+            threading.Thread(target=_send_lead_email, daemon=True).start()
         except Exception as e:
             # Log error but don't fail the request if email fails
-            print(f"Failed to send email notification: {e}")
+            print(f"Failed to dispatch email notification thread: {e}")
         
         return Response({'success': True, 'leadRequest': LeadRequestSerializer(serializer.instance).data}, status=status.HTTP_201_CREATED)
 
@@ -1187,11 +1326,22 @@ You can approve or reject this request in the admin dashboard.
             lead_request.status = 'approved'
             lead_request.save()
 
+            # Record approval activity
+            purchase = SubscriptionService.get_active_purchase(lead_request.user)
+            SubscriptionService.record_lead_request_status(lead_request.user, lead_request, 'approved', purchase)
+
             # Reject all other pending requests for this session
-            LeadRequest.objects.filter(
+            rejected_requests = LeadRequest.objects.filter(
                 session=lead_request.session,
                 status='pending'
-            ).exclude(id=lead_request.id).update(status='rejected')
+            ).exclude(id=lead_request.id)
+            
+            for rejected_request in rejected_requests:
+                rejected_request.status = 'rejected'
+                rejected_request.save()
+                # Record rejection activity for each
+                rejected_purchase = SubscriptionService.get_active_purchase(rejected_request.user)
+                SubscriptionService.record_lead_request_status(rejected_request.user, rejected_request, 'rejected', rejected_purchase)
 
         serializer = self.get_serializer(lead_request)
         return Response({'success': True, 'leadRequest': serializer.data})
@@ -1210,6 +1360,10 @@ You can approve or reject this request in the admin dashboard.
 
         lead_request.status = 'rejected'
         lead_request.save()
+        
+        # Record rejection activity
+        purchase = SubscriptionService.get_active_purchase(lead_request.user)
+        SubscriptionService.record_lead_request_status(lead_request.user, lead_request, 'rejected', purchase)
 
         serializer = self.get_serializer(lead_request)
         return Response({'success': True, 'leadRequest': serializer.data})
@@ -1439,6 +1593,37 @@ class PurchaseViewSet(viewsets.ModelViewSet):
                 purchase.payment_date = timezone.now()
                 purchase.save()
                 
+                # Generate PDF invoice
+                try:
+                    from .pdf_service import PDFInvoiceService
+                    invoice_url = PDFInvoiceService.generate_and_save_invoice(purchase)
+                    if invoice_url:
+                        print(f"Generated invoice PDF for purchase {purchase.id}: {invoice_url}")
+                except Exception as pdf_error:
+                    print(f"Failed to generate PDF invoice: {pdf_error}")
+                
+                # Send payment confirmation email
+                try:
+                    from .email_service import EmailService
+                    user_name = purchase.user.first_name if purchase.user.first_name else purchase.user.email.split('@')[0]
+                    
+                    # Get frontend URL for invoice download
+                    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                    invoice_download_link = f"{frontend_url}/billing"
+                    
+                    EmailService.send_payment_confirmation_email(
+                        to_email=purchase.user.email,
+                        user_name=user_name,
+                        package_name=purchase.package.name,
+                        amount=f"${purchase.amount:.2f} {purchase.currency}",
+                        invoice_number=purchase.invoice_number or f"INV-{purchase.id}",
+                        payment_date=purchase.payment_date.strftime('%B %d, %Y') if purchase.payment_date else purchase.created_at.strftime('%B %d, %Y'),
+                        invoice_download_link=invoice_download_link
+                    )
+                    print(f"Sent payment confirmation email to {purchase.user.email}")
+                except Exception as email_error:
+                    print(f"Failed to send payment confirmation email: {email_error}")
+                
                 return Response({
                     'success': True,
                     'purchase': PurchaseSerializer(purchase).data
@@ -1558,6 +1743,50 @@ class PurchaseViewSet(viewsets.ModelViewSet):
             'invoiceNumber': invoice_number
         })
 
+    @action(detail=True, methods=['post'])
+    def user_generate_invoice(self, request, pk=None):
+        """User endpoint to generate invoice for their own purchase"""
+        if not request.user.is_authenticated:
+            return Response(
+                {'success': False, 'error': 'Authentication required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        purchase = self.get_object()
+        
+        # Check if the purchase belongs to the current user
+        if purchase.user != request.user:
+            return Response(
+                {'success': False, 'error': 'You can only generate invoices for your own purchases'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if purchase.invoice_number:
+            # Invoice already exists, return it
+            return Response({
+                'success': True,
+                'purchase': PurchaseSerializer(purchase).data,
+                'invoiceNumber': purchase.invoice_number,
+                'invoice_url': purchase.receipt_url
+            })
+        
+        # Generate unique invoice number
+        import uuid
+        invoice_prefix = "INV"
+        timestamp = timezone.now().strftime('%Y%m%d')
+        unique_id = str(uuid.uuid4())[:8].upper()
+        invoice_number = f"{invoice_prefix}-{timestamp}-{unique_id}"
+        
+        purchase.invoice_number = invoice_number
+        purchase.save()
+        
+        return Response({
+            'success': True,
+            'purchase': PurchaseSerializer(purchase).data,
+            'invoiceNumber': invoice_number,
+            'invoice_url': purchase.receipt_url
+        })
+
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
     def payment_report(self, request):
         """Admin endpoint to get payment statistics and reports"""
@@ -1645,6 +1874,52 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         return Response({
             'success': True,
             'purchase': PurchaseSerializer(purchase).data
+        })
+
+
+class PaymentMethodViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing user payment methods"""
+    serializer_class = PaymentMethodSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        # Users can only see their own payment methods
+        return PaymentMethod.objects.filter(user=self.request.user)
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return PaymentMethodCreateSerializer
+        return PaymentMethodSerializer
+    
+    def perform_create(self, serializer):
+        # Associate the payment method with the current user
+        serializer.save(user=self.request.user)
+        
+        # If this is set as default, unset other default methods
+        if serializer.validated_data.get('is_default', False):
+            PaymentMethod.objects.filter(
+                user=self.request.user,
+                is_default=True
+            ).update(is_default=False)
+    
+    def perform_update(self, serializer):
+        # If this is set as default, unset other default methods
+        if serializer.validated_data.get('is_default', False):
+            PaymentMethod.objects.filter(
+                user=self.request.user,
+                is_default=True
+            ).exclude(id=self.get_object().id).update(is_default=False)
+        
+        serializer.save()
+    
+    @action(detail=False, methods=['get'])
+    def user_payment_methods(self, request):
+        """Get all payment methods for the authenticated user"""
+        payment_methods = self.get_queryset()
+        serializer = self.get_serializer(payment_methods, many=True)
+        return Response({
+            'success': True,
+            'paymentMethods': serializer.data
         })
 
 
@@ -1779,7 +2054,7 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         # For development, allow read access without strict authentication
         # In production, you should enforce proper authentication
-        if self.action in ['list', 'retrieve', 'public', 'by_category', 'upload_attachment']:
+        if self.action in ['list', 'retrieve', 'public', 'by_category', 'upload_attachment', 'generate_favicon']:
             return []  # Allow access for development
         # Require admin permission for write operations
         if self.action in ['create', 'update', 'partial_update', 'destroy', 'bulk_update']:
@@ -1929,5 +2204,75 @@ class SystemSettingsViewSet(viewsets.ModelViewSet):
             'url': relative_url,
             'filename': filename
         })
+
+    @action(detail=False, methods=['get'])
+    def generate_favicon(self, request):
+        """Generate a text-based favicon from the app name setting"""
+        from django.http import HttpResponse
+        
+        try:
+            # Get the app name from settings
+            app_name_setting = SystemSettings.objects.filter(key='app_name').first()
+            app_name = app_name_setting.value if app_name_setting else 'APP'
+            
+            # Get color from settings or use default
+            color_setting = SystemSettings.objects.filter(key='primary_color').first()
+            bg_color = color_setting.value if color_setting else '#2563eb'
+            
+            # Parse the hex color
+            bg_color = bg_color.lstrip('#')
+            r = int(bg_color[0:2], 16) if len(bg_color) >= 2 else 37
+            g = int(bg_color[2:4], 16) if len(bg_color) >= 4 else 99
+            b = int(bg_color[4:6], 16) if len(bg_color) >= 6 else 235
+            
+            # Create a 32x32 image
+            size = 32
+            image = Image.new('RGB', (size, size), color=(r, g, b))
+            draw = ImageDraw.Draw(image)
+            
+            # Get the first 1-2 characters from app name
+            text = app_name[:2].upper()
+            
+            # Try to use a simple font, fallback to default
+            try:
+                # Try to use a system font
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+            except:
+                try:
+                    font = ImageFont.truetype("arial.ttf", 20)
+                except:
+                    font = ImageFont.load_default()
+            
+            # Calculate text position to center it
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            x = (size - text_width) // 2
+            y = (size - text_height) // 2
+            
+            # Draw white text
+            draw.text((x, y), text, fill=(255, 255, 255), font=font)
+            
+            # Convert to bytes
+            buffer = BytesIO()
+            image.save(buffer, format='PNG')
+            buffer.seek(0)
+            
+            # Return as image response
+            response = HttpResponse(buffer.getvalue(), content_type='image/png')
+            response['Cache-Control'] = 'public, max-age=3600'  # Cache for 1 hour
+            return response
+            
+        except Exception as e:
+            # Fallback: return a simple colored square
+            size = 32
+            image = Image.new('RGB', (size, size), color=(37, 99, 235))
+            buffer = BytesIO()
+            image.save(buffer, format='PNG')
+            buffer.seek(0)
+            
+            response = HttpResponse(buffer.getvalue(), content_type='image/png')
+            response['Cache-Control'] = 'public, max-age=3600'
+            return response
 
 

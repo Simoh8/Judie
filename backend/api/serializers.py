@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase, SystemSettings
+from .models import User, Session, Booking, Review, LeadRequest, Package, Purchase, SystemSettings, PaymentMethod, UserActivity
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -272,3 +272,64 @@ class SystemSettingsUpdateSerializer(serializers.ModelSerializer):
         if attrs.get('is_encrypted') and self.instance.setting_type != 'string':
             raise serializers.ValidationError('Encryption can only be used with string type settings')
         return attrs
+
+    def update(self, instance, validated_data):
+        # Handle encrypted values manually
+        if 'value' in validated_data and instance.is_encrypted:
+            # For encrypted fields, we need to encrypt the new value
+            from .models import EncryptionManager
+            validated_data['value'] = EncryptionManager.encrypt(validated_data['value'])
+        
+        # Update the instance
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
+
+
+class PaymentMethodSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    paymentType = serializers.CharField(source='get_payment_type_display', read_only=True)
+    cardLast4 = serializers.CharField(source='card_last4', read_only=True)
+    cardExpiryMonth = serializers.CharField(source='card_expiry_month', read_only=True)
+    cardExpiryYear = serializers.CharField(source='card_expiry_year', read_only=True)
+    cardBrand = serializers.CharField(source='card_brand', read_only=True)
+    paystackAuthCode = serializers.CharField(source='paystack_auth_code', read_only=True)
+    paystackToken = serializers.CharField(source='paystack_token', read_only=True)
+    isDefault = serializers.BooleanField(source='is_default')
+    isActive = serializers.BooleanField(source='is_active')
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = PaymentMethod
+        fields = ['id', 'user', 'paymentType', 'cardLast4', 'cardExpiryMonth', 'cardExpiryYear',
+                  'cardBrand', 'paystackAuthCode', 'paystackToken', 'isDefault', 'isActive',
+                  'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'createdAt', 'updatedAt']
+
+
+class PaymentMethodCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentMethod
+        fields = ['payment_type', 'card_last4', 'card_expiry_month', 'card_expiry_year', 'card_brand',
+                  'paystack_auth_code', 'paystack_token', 'is_default']
+        extra_kwargs = {
+            'is_default': {'required': False},
+        }
+
+
+class UserActivitySerializer(serializers.ModelSerializer):
+    userEmail = serializers.EmailField(source='user.email', read_only=True)
+    sessionTitle = serializers.CharField(source='session.title', read_only=True)
+    packageName = serializers.CharField(source='purchase.package.name', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    activityTypeDisplay = serializers.CharField(source='get_activity_type_display', read_only=True)
+
+    class Meta:
+        model = UserActivity
+        fields = ['id', 'user', 'userEmail', 'activity_type', 'activityTypeDisplay', 'session', 'sessionTitle',
+                  'purchase', 'packageName', 'lead_request', 'description', 'metadata', 
+                  'sessions_consumed', 'lead_requests_consumed', 'createdAt']
+        read_only_fields = ['id', 'userEmail', 'sessionTitle', 'packageName', 'createdAt', 'activityTypeDisplay']

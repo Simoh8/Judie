@@ -6,6 +6,7 @@ from .views import (
     SessionViewSet, UserViewSet, ReviewViewSet, LeadRequestViewSet,
     ForgotPasswordView, ResetPasswordView, VerifyResetTokenView,
     PackageViewSet, PurchaseViewSet, SystemSettingsViewSet, EnvironmentVariablesView,
+    PaymentMethodViewSet,
 )
 
 router = DefaultRouter()
@@ -15,6 +16,7 @@ router.register(r'reviews', ReviewViewSet, basename='review')
 router.register(r'lead-requests', LeadRequestViewSet, basename='lead-request')
 router.register(r'packages', PackageViewSet, basename='package')
 router.register(r'purchases', PurchaseViewSet, basename='purchase')
+router.register(r'payment-methods', PaymentMethodViewSet, basename='payment-method')
 router.register(r'settings', SystemSettingsViewSet, basename='settings')
 
 urlpatterns = [

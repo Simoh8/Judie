@@ -19,7 +19,11 @@ export async function GET(request: NextRequest) {
     if (status) queryParams.append('status', status);
     if (paystack_reference) queryParams.append('paystack_reference', paystack_reference);
 
-    const response = await fetch(`${BACKEND_URL}/api/purchases/?${queryParams.toString()}`, {
+    const url = queryParams.toString() 
+      ? `${BACKEND_URL}/api/purchases/?${queryParams.toString()}`
+      : `${BACKEND_URL}/api/purchases/`;
+
+    const response = await fetch(url, {
       headers: getAuthHeaders(request),
     });
     const data = await response.json();

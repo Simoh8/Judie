@@ -208,7 +208,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           };
         });
         // Background silent sync
-        await get().loadSessions(true);
+        get().loadSessions(true);
       } else {
         set({ error: 'Failed to book session' });
       }
@@ -243,7 +243,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           };
         });
         // Background silent sync
-        await get().loadSessions(true);
+        get().loadSessions(true);
       } else {
         set({ error: 'Failed to cancel booking' });
       }
@@ -284,7 +284,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           };
         });
         // Background silent sync
-        await get().loadSessions(true);
+        get().loadSessions(true);
       } else {
         set({ error: 'Failed to leave session' });
       }

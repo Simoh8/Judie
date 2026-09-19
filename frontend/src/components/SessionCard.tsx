@@ -76,24 +76,29 @@ export default function SessionCard({
     if (!user?.id || isLoading) return;
 
     setLoading(true);
+    // Optimistic UI updates
+    (session as any).isBooked = true;
+    if (user && typeof user.sessionsJoined === 'number') {
+      setUser({ ...user, sessionsJoined: user.sessionsJoined + 1 });
+    }
+
     try {
       await bookSession(session.id, user.id);
-      await refreshUserData();
-      // Increment sessionsJoined count locally if needed
-      if (user && typeof user.sessionsJoined === 'number') {
-        const updatedUser = { ...user, sessionsJoined: user.sessionsJoined + 1 };
-        setUser(updatedUser);
-      }
-      // Force a re-render by updating the session's isBooked property
-      (session as any).isBooked = true;
-      // Call parent's session action handler to refresh dashboard data
-      if (onSessionAction) {
-        await onSessionAction();
-      }
     } catch (error) {
+      // Revert on failure
+      (session as any).isBooked = false;
+      if (user && typeof user.sessionsJoined === 'number') {
+        setUser({ ...user, sessionsJoined: Math.max(0, user.sessionsJoined - 1) });
+      }
       console.error("Failed to join session:", error);
     } finally {
       setLoading(false);
+    }
+
+    // Background non-blocking syncs
+    refreshUserData();
+    if (onSessionAction) {
+      onSessionAction();
     }
   };
 
@@ -106,28 +111,33 @@ export default function SessionCard({
     if (!user?.id) return;
 
     setLoading(true);
+    // Optimistic UI updates
+    (session as any).isBooked = false;
+    if (user && typeof user.sessionsJoined === 'number' && !session.isOngoing && session.status !== 'live') {
+      setUser({ ...user, sessionsJoined: Math.max(0, user.sessionsJoined - 1) });
+    }
+
     try {
-      // Use leaveSession for ongoing sessions, cancelBooking for scheduled sessions
       if (session.isOngoing || session.status === 'live') {
         await leaveSession(session.id, user.id);
       } else {
         await cancelBooking(session.id, user.id);
       }
-      await refreshUserData();
-      // Decrement sessionsJoined count locally if needed (only for cancellations)
-      if (user && typeof user.sessionsJoined === 'number' && !session.isOngoing && session.status !== 'live') {
-        const updatedUser = { ...user, sessionsJoined: Math.max(0, user.sessionsJoined - 1) };
-        setUser(updatedUser);
-      }
-      (session as any).isBooked = false;
-      // Call parent's session action handler to refresh dashboard data
-      if (onSessionAction) {
-        await onSessionAction();
-      }
     } catch (error) {
+      // Revert on failure
+      (session as any).isBooked = true;
+      if (user && typeof user.sessionsJoined === 'number' && !session.isOngoing && session.status !== 'live') {
+        setUser({ ...user, sessionsJoined: user.sessionsJoined + 1 });
+      }
       console.error("Failed to leave session:", error);
     } finally {
       setLoading(false);
+    }
+
+    // Background non-blocking syncs
+    refreshUserData();
+    if (onSessionAction) {
+      onSessionAction();
     }
   };
 

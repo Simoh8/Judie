@@ -23,7 +23,7 @@ class Command(BaseCommand):
                 'value': '',
                 'category': 'frontend',
                 'setting_type': 'string',
-                'description': 'URL to the favicon image',
+                'description': 'URL to the favicon image (optional - if empty, favicon is auto-generated from app name)',
                 'is_encrypted': False,
                 'is_public': True,
             },

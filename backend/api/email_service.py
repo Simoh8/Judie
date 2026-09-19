@@ -34,17 +34,25 @@ class EmailService:
         """
         try:
             from_email = from_email or getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@flown.com')
-            send_mail(
-                subject,
-                plain_message,
-                from_email,
-                [to_email],
-                html_message=html_message,
-                fail_silently=False,
-            )
+            import threading
+            def _send_target():
+                try:
+                    send_mail(
+                        subject,
+                        plain_message,
+                        from_email,
+                        [to_email],
+                        html_message=html_message,
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    print(f"Failed to send email to {to_email}: {e}")
+
+            thread = threading.Thread(target=_send_target, daemon=True)
+            thread.start()
             return True
         except Exception as e:
-            print(f"Failed to send email to {to_email}: {e}")
+            print(f"Failed to dispatch email thread to {to_email}: {e}")
             return False
     
     @staticmethod
@@ -389,6 +397,180 @@ See you there!'''
             title="Booking Confirmed",
             content=html_content,
             preheader="Your session booking is confirmed"
+        )
+        
+        return EmailService.send_email(to_email, subject, plain_message, html_message)
+    
+    @staticmethod
+    def send_subscription_reminder_email(
+        to_email: str,
+        user_name: str,
+        package_name: str,
+        expiry_date: str,
+        renewal_link: str,
+        days_remaining: int
+    ) -> bool:
+        """
+        Send subscription renewal reminder email
+        
+        Args:
+            to_email: User's email address
+            user_name: User's first name or email prefix
+            package_name: Name of the subscription package
+            expiry_date: Date when subscription expires
+            renewal_link: Link to renew subscription
+            days_remaining: Number of days until expiry
+            
+        Returns:
+            bool: True if email was sent successfully
+        """
+        subject = f"Your {package_name} subscription expires in {days_remaining} days"
+        
+        urgency_text = "soon" if days_remaining <= 3 else f"in {days_remaining} days"
+        
+        plain_message = f'''Hi {user_name},
+
+This is a friendly reminder that your {package_name} subscription will expire {urgency_text} on {expiry_date}.
+
+To avoid any interruption to your service, please renew your subscription before it expires.
+
+You can renew your subscription by visiting: {renewal_link}
+
+If you have any questions or need assistance, please don't hesitate to contact our support team.
+
+Thanks,
+The Flown Team'''
+        
+        html_content = f'''
+        <p style="font-size: 18px; font-weight: 600; margin-top: 0; margin-bottom: 16px; color: #0f172a;">
+          Hi {user_name},
+        </p>
+        <p style="font-size: 16px; line-height: 24px; color: #475569; margin-bottom: 24px;">
+          This is a friendly reminder that your <strong>{package_name}</strong> subscription will expire {urgency_text} on <strong>{expiry_date}</strong>.
+        </p>
+        
+        <div class="card" style="background-color: #fff7ed; border-color: #fed7aa;">
+          <p style="font-size: 14px; line-height: 20px; color: #9a3412; margin: 0;">
+            <strong>⚠️ Action Required:</strong> To avoid any interruption to your service, please renew your subscription before it expires.
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="{renewal_link}" target="_blank" class="btn">Renew Subscription</a>
+        </div>
+        
+        <p style="font-size: 14px; line-height: 20px; color: #64748b; margin-bottom: 8px;">
+          If you have any questions or need assistance, please don't hesitate to contact our support team.
+        </p>
+        
+        <p style="font-size: 16px; line-height: 24px; color: #475569; margin-bottom: 0;">
+          Thanks,<br>
+          <strong>The Flown Team</strong>
+        </p>
+        '''
+        
+        html_message = EmailService.generate_base_html_template(
+            title="Subscription Renewal Reminder",
+            content=html_content,
+            preheader=f"Your {package_name} subscription expires soon"
+        )
+        
+        return EmailService.send_email(to_email, subject, plain_message, html_message)
+    
+    @staticmethod
+    def send_payment_confirmation_email(
+        to_email: str,
+        user_name: str,
+        package_name: str,
+        amount: str,
+        invoice_number: str,
+        payment_date: str,
+        invoice_download_link: str
+    ) -> bool:
+        """
+        Send payment confirmation email with invoice details
+        
+        Args:
+            to_email: User's email address
+            user_name: User's first name or email prefix
+            package_name: Name of the purchased package
+            amount: Payment amount with currency
+            invoice_number: Invoice number
+            payment_date: Date of payment
+            invoice_download_link: Link to download PDF invoice
+            
+        Returns:
+            bool: True if email was sent successfully
+        """
+        subject = f"Payment Confirmation: {invoice_number}"
+        
+        plain_message = f'''Hi {user_name},
+
+Thank you for your payment! Your subscription has been successfully processed.
+
+Payment Details:
+- Package: {package_name}
+- Amount: {amount}
+- Invoice Number: {invoice_number}
+- Payment Date: {payment_date}
+
+You can download your invoice from: {invoice_download_link}
+
+Your subscription is now active. Enjoy your continued access to Flown!
+
+Thanks,
+The Flown Team'''
+        
+        html_content = f'''
+        <p style="font-size: 18px; font-weight: 600; margin-top: 0; margin-bottom: 16px; color: #0f172a;">
+          Hi {user_name},
+        </p>
+        <p style="font-size: 16px; line-height: 24px; color: #475569; margin-bottom: 24px;">
+          Thank you for your payment! Your subscription has been successfully processed.
+        </p>
+        
+        <div class="card">
+          <div style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+            Payment Details
+          </div>
+          <div style="margin-bottom: 8px; font-size: 14px; line-height: 20px;">
+            <span style="color: #64748b; font-weight: 500; display: inline-block; width: 140px;">Package</span>
+            <span style="color: #0f172a; font-weight: 600;">{package_name}</span>
+          </div>
+          <div style="margin-bottom: 8px; font-size: 14px; line-height: 20px;">
+            <span style="color: #64748b; font-weight: 500; display: inline-block; width: 140px;">Amount</span>
+            <span style="color: #0f172a; font-weight: 600;">{amount}</span>
+          </div>
+          <div style="margin-bottom: 8px; font-size: 14px; line-height: 20px;">
+            <span style="color: #64748b; font-weight: 500; display: inline-block; width: 140px;">Invoice Number</span>
+            <span style="color: #0f172a; font-weight: 600;">{invoice_number}</span>
+          </div>
+          <div style="margin-bottom: 0; font-size: 14px; line-height: 20px;">
+            <span style="color: #64748b; font-weight: 500; display: inline-block; width: 140px;">Payment Date</span>
+            <span style="color: #0f172a; font-weight: 600;">{payment_date}</span>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="{invoice_download_link}" target="_blank" class="btn">Download Invoice</a>
+        </div>
+        
+        <div class="card" style="background-color: #f0fdf4; border-color: #86efac;">
+          <p style="font-size: 14px; line-height: 20px; color: #166534; margin: 0;">
+            <strong>✅ Payment Successful:</strong> Your subscription is now active. Enjoy your continued access to Flown!
+          </p>
+        </div>
+        
+        <p style="font-size: 16px; line-height: 24px; color: #475569; margin-bottom: 0;">
+          Thanks,<br>
+          <strong>The Flown Team</strong>
+        </p>
+        '''
+        
+        html_message = EmailService.generate_base_html_template(
+            title="Payment Confirmation",
+            content=html_content,
+            preheader="Your payment has been processed successfully"
         )
         
         return EmailService.send_email(to_email, subject, plain_message, html_message)

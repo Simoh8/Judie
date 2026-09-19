@@ -164,7 +164,40 @@ class PaystackService:
                         purchase = Purchase.objects.get(id=purchase_id)
                         purchase.status = 'completed'
                         purchase.paystack_transaction_id = data.get('id')
+                        purchase.payment_date = timezone.now()
                         purchase.save()
+                        
+                        # Generate PDF invoice
+                        try:
+                            from .pdf_service import PDFInvoiceService
+                            invoice_url = PDFInvoiceService.generate_and_save_invoice(purchase)
+                            if invoice_url:
+                                print(f"Generated invoice PDF for purchase {purchase.id}: {invoice_url}")
+                        except Exception as pdf_error:
+                            print(f"Failed to generate PDF invoice: {pdf_error}")
+                        
+                        # Send payment confirmation email
+                        try:
+                            from .email_service import EmailService
+                            user_name = purchase.user.first_name if purchase.user.first_name else purchase.user.email.split('@')[0]
+                            
+                            # Get frontend URL for invoice download
+                            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                            invoice_download_link = f"{frontend_url}/billing"
+                            
+                            EmailService.send_payment_confirmation_email(
+                                to_email=purchase.user.email,
+                                user_name=user_name,
+                                package_name=purchase.package.name,
+                                amount=f"${purchase.amount:.2f} {purchase.currency}",
+                                invoice_number=purchase.invoice_number or f"INV-{purchase.id}",
+                                payment_date=purchase.payment_date.strftime('%B %d, %Y') if purchase.payment_date else purchase.created_at.strftime('%B %d, %Y'),
+                                invoice_download_link=invoice_download_link
+                            )
+                            print(f"Sent payment confirmation email to {purchase.user.email}")
+                        except Exception as email_error:
+                            print(f"Failed to send payment confirmation email: {email_error}")
+                        
                         return True
                     except Purchase.DoesNotExist:
                         print(f"Purchase {purchase_id} not found")

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Menu, X, User, ChevronDown, LayoutDashboard, CalendarDays, UserCircle, LogOut, ShieldCheck } from "lucide-react";
+import { Menu, X, User, ChevronDown, LayoutDashboard, CalendarDays, UserCircle, LogOut, ShieldCheck, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthModal from "./AuthModal";
 
@@ -65,6 +65,7 @@ export default function Navbar() {
 
   const dropdownNavItems = [
     { name: "Profile", href: "/profile", icon: UserCircle },
+    { name: "Billing", href: "/billing", icon: CreditCard },
   ];
 
   const displayName = user?.firstName || user?.email?.split("@")[0] || "Account";
@@ -150,6 +151,17 @@ export default function Navbar() {
                         >
                           <CalendarDays size={16} />
                           <span className="hidden sm:inline">My Sessions</span>
+                        </Link>
+                        <Link
+                          href="/billing"
+                          className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-200 ${
+                            pathname === "/billing"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
+                          }`}
+                        >
+                          <CreditCard size={16} />
+                          <span className="hidden sm:inline">Billing</span>
                         </Link>
                       </>
                     )}
@@ -314,6 +326,18 @@ export default function Navbar() {
                         >
                           <CalendarDays size={18} />
                           My Sessions
+                        </Link>
+                        <Link
+                          href="/billing"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors duration-150 ${
+                            pathname === "/billing"
+                              ? "text-ios-blue bg-ios-blue/5"
+                              : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                          }`}
+                        >
+                          <CreditCard size={18} />
+                          Billing
                         </Link>
                       </>
                     )}

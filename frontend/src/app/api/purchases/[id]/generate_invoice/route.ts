@@ -1,0 +1,36 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const BACKEND_URL = process.env.NEXT__BACKEND_URL || 'http://localhost:8000';
+
+const getAuthHeaders = (request: NextRequest): Record<string, string> => {
+  const authHeader = request.headers.get('authorization');
+  return authHeader ? { Authorization: authHeader } : {};
+};
+
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const { id } = params;
+
+    const response = await fetch(`${BACKEND_URL}/api/purchases/${id}/user_generate_invoice/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(request),
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Generate invoice error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
