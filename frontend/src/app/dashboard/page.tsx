@@ -52,48 +52,48 @@ export default function Dashboard() {
     setUpcomingSessions(futureSessions.slice(0, 3));
   }, [sessions]);
 
-  useEffect(() => {
-    async function fetchBookedSessions() {
-      if (!user?.id) return;
+  const fetchBookedSessions = useCallback(async () => {
+    if (!user?.id) return;
 
-      try {
-        await loadUserBookedSessions(user.id);
-        const userSessions = await getUserSessions();
-        // Filter out past sessions (ongoing and live sessions are always included)
-        const now = new Date();
-        const futureSessions = userSessions.filter((session: Session) => {
-          const extendedSession = session as ExtendedSession;
-          // Include ongoing sessions or live sessions
-          if (extendedSession.isOngoing || session.status === 'live') return true;
-          const scheduledDate = new Date(session.scheduledFor);
-          return scheduledDate > now;
-        });
-        const sessionsWithBookingStatus = futureSessions.map((session: Session) => ({
-          ...session,
-          isBooked: true
-        }));
-        setBookedSessions(sessionsWithBookingStatus);
+    try {
+      await loadUserBookedSessions(user.id);
+      const userSessions = await getUserSessions();
+      // Filter out past sessions (ongoing and live sessions are always included)
+      const now = new Date();
+      const futureSessions = userSessions.filter((session: Session) => {
+        const extendedSession = session as ExtendedSession;
+        // Include ongoing sessions or live sessions
+        if (extendedSession.isOngoing || session.status === 'live') return true;
+        const scheduledDate = new Date(session.scheduledFor);
+        return scheduledDate > now;
+      });
+      const sessionsWithBookingStatus = futureSessions.map((session: Session) => ({
+        ...session,
+        isBooked: true
+      }));
+      setBookedSessions(sessionsWithBookingStatus);
 
-        const statuses: Record<string, string> = {};
-        for (const session of sessionsWithBookingStatus) {
-          try {
-            const response = await fetch(`/api/lead-requests?user=${user.id}&session=${session.id}`);
-            const data = await response.json();
-            if (data.success && data.leadRequests && data.leadRequests.length > 0) {
-              statuses[session.id] = data.leadRequests[0].status;
-            }
-          } catch (error) {
-            console.error(`Failed to fetch lead request for session ${session.id}:`, error);
+      const statuses: Record<string, string> = {};
+      for (const session of sessionsWithBookingStatus) {
+        try {
+          const response = await fetch(`/api/lead-requests?user=${user.id}&session=${session.id}`);
+          const data = await response.json();
+          if (data.success && data.leadRequests && data.leadRequests.length > 0) {
+            statuses[session.id] = data.leadRequests[0].status;
           }
+        } catch (error) {
+          console.error(`Failed to fetch lead request for session ${session.id}:`, error);
         }
-        setLeadRequestStatuses(statuses);
-      } catch (error) {
-        console.error("Failed to fetch booked sessions:", error);
       }
+      setLeadRequestStatuses(statuses);
+    } catch (error) {
+      console.error("Failed to fetch booked sessions:", error);
     }
-
-    fetchBookedSessions();
   }, [user?.id, loadUserBookedSessions, getUserSessions]);
+
+  useEffect(() => {
+    fetchBookedSessions();
+  }, [fetchBookedSessions]);
 
   const refreshUserData = useCallback(async () => {
     if (!user?.id) return;
@@ -165,18 +165,21 @@ export default function Dashboard() {
     }
   };
   
-  const handleSessionAction = async () => {
-    // Refresh all data when a session action occurs (join/cancel)
-    const promises = [
-      refreshUserData(),
-      refreshLeadRequests(),
-      useSessionStore.getState().loadSessions(true),
-    ];
-    if (user?.id) {
-      promises.push(loadUserBookedSessions(user.id));
+  const handleSessionAction = useCallback((action: 'joined' | 'left', sessionId: string) => {
+    if (action === 'left') {
+      // Immediately remove from bookedSessions
+      setBookedSessions(prev => prev.filter(s => s.id !== sessionId));
+    } else if (action === 'joined') {
+      // Immediately add to bookedSessions from upcomingSessions
+      const joined = upcomingSessions.find(s => s.id === sessionId);
+      if (joined && !bookedSessions.some(s => s.id === sessionId)) {
+        setBookedSessions(prev => [{ ...joined, isBooked: true }, ...prev]);
+      }
     }
-    await Promise.all(promises);
-  };
+    // Background refetch to sync real server state
+    fetchBookedSessions();
+    refreshLeadRequests();
+  }, [upcomingSessions, bookedSessions, fetchBookedSessions, refreshLeadRequests]);
 
   const handleReview = async (rating: number, comment: string) => {
     if (!user?.id || !selectedSession) return;

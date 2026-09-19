@@ -279,7 +279,7 @@ class ForgotPasswordView(APIView):
         # Generate reset token
         import secrets
         reset_token = secrets.token_urlsafe(32)
-        reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        reset_token_expires = timezone.now() + timedelta(hours=1)
         
         # Save token to user
         user.password_reset_token = reset_token

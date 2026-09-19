@@ -88,10 +88,15 @@ export default function MySessions() {
     fetchSessions();
   }, [fetchSessions]);
 
-  const handleSessionAction = useCallback(async () => {
-    await refreshUserData();
-    await fetchSessions();
-  }, [refreshUserData, fetchSessions]);
+  const handleSessionAction = useCallback((action: 'joined' | 'left', sessionId: string) => {
+    if (action === 'left') {
+      // Immediately remove from sessions list
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+    }
+    // Background refetch to sync real server state
+    fetchSessions();
+    refreshUserData();
+  }, [fetchSessions, refreshUserData]);
 
   const handleReview = async (rating: number, comment: string) => {
     if (!user?.id || !selectedSession) return;

@@ -27,7 +27,7 @@ interface SessionCardProps {
   leadRequestStatus?: string;
   loadingSessionId?: string | null;
   onLoadingChange?: (loading: boolean, sessionId: string) => void;
-  onSessionAction?: () => void;
+  onSessionAction?: (action: 'joined' | 'left', sessionId: string) => void;
 }
 
 export default function SessionCard({
@@ -98,7 +98,7 @@ export default function SessionCard({
     // Background non-blocking syncs
     refreshUserData();
     if (onSessionAction) {
-      onSessionAction();
+      onSessionAction('joined', session.id);
     }
   };
 
@@ -137,7 +137,7 @@ export default function SessionCard({
     // Background non-blocking syncs
     refreshUserData();
     if (onSessionAction) {
-      onSessionAction();
+      onSessionAction('left', session.id);
     }
   };
 
