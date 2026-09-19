@@ -24,11 +24,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
+    console.log("PUT request body:", body);
+    
     const { 
       name, 
       description, 
       price, 
       duration, 
+      trial_days,
       max_lead_requests, 
       max_sessions, 
       allowed_session_types, 
@@ -39,14 +42,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       sort_order 
     } = body;
 
-    const response = await fetch(`${BACKEND_URL}/api/packages/${params.id}/`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const requestBody = {
         name,
         description,
         price,
         duration,
+        trial_days,
         max_lead_requests,
         max_sessions,
         allowed_session_types,
@@ -55,10 +56,18 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         is_active,
         is_featured,
         sort_order
-      }),
+    };
+    
+    console.log("Sending to backend:", requestBody);
+
+    const response = await fetch(`${BACKEND_URL}/api/packages/${params.id}/`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
+    console.log("Backend response:", response.status, data);
 
     if (!response.ok) {
       return NextResponse.json(data, { status: response.status });

@@ -158,7 +158,7 @@ export default function AdminPackagesPage() {
       name: pkg.name,
       description: pkg.description,
       price: pkg.price.toString(),
-      duration: pkg.duration,
+      duration: pkg.rawDuration || pkg.duration,
       trial_days: pkg.trialDays?.toString() || (pkg as any).trial_days?.toString() || '0',
       max_lead_requests: pkg.maxLeadRequests.toString(),
       max_sessions: pkg.maxSessions.toString(),

@@ -168,6 +168,10 @@ class PackageCreateSerializer(serializers.ModelSerializer):
                   'max_lead_requests', 'max_sessions', 'allowed_session_types', 
                   'max_session_duration', 'supported_regions', 'is_active', 
                   'is_featured', 'sort_order']
+    
+    def validate(self, data):
+        print("PackageCreateSerializer validate called with data:", data)
+        return data
 
 
 class PurchaseSerializer(serializers.ModelSerializer):
