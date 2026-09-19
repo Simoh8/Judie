@@ -109,7 +109,7 @@ export default function BillingPage() {
       if (invoicesData.success && invoicesData.purchases) {
         const formattedInvoices = invoicesData.purchases.map((purchase: any) => ({
           id: purchase.id,
-          invoice_number: purchase.invoiceNumber || `INV-${purchase.id.slice(0, 8)}`,
+          invoice_number: purchase.invoiceNumber || `INV-${String(purchase.id).slice(0, 8)}`,
           amount: purchase.amount,
           currency: purchase.currency,
           status: purchase.status,
