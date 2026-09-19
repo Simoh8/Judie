@@ -1449,11 +1449,6 @@ class PackageViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response({'success': True, 'packages': serializer.data})
-    
-    def update(self, request, *args, **kwargs):
-        print("PackageViewSet update called")
-        print("Request data:", request.data)
-        return super().update(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

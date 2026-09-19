@@ -13,6 +13,7 @@ interface Package {
   description: string;
   price: number;
   duration: string;
+  rawDuration?: string;
   trialDays?: number;
   maxLeadRequests: number;
   maxSessions: number;
