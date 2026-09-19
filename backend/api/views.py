@@ -25,6 +25,7 @@ from .zoom_service import ZoomService
 from .email_service import EmailService
 from .paystack_service import PaystackService
 from .subscription_service import SubscriptionService
+from .currency_service import CurrencyService
 import json
 
 
@@ -999,7 +1000,8 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             return [permissions.IsAdminUser()]
         elif self.action == 'update':
-            return [permissions.IsAdminUser()]
+            # Allow users to update their own profile (for currency preference)
+            return [permissions.IsAuthenticated()]
         elif self.action == 'retrieve':
             return [permissions.IsAuthenticated()]
         return [permissions.IsAuthenticated()]
@@ -1017,6 +1019,14 @@ class UserViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        
+        # Allow users to update their own profile (for currency preference)
+        if instance != request.user and not request.user.is_staff:
+            return Response(
+                {'success': False, 'error': 'You can only update your own profile'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
@@ -1029,6 +1039,49 @@ class UserViewSet(viewsets.ModelViewSet):
         sessions = [booking.session for booking in bookings]
         serializer = SessionSerializer(sessions, many=True)
         return Response({'success': True, 'sessions': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    def set_currency(self, request, pk=None):
+        """Set user's preferred currency"""
+        # Allow users to update their own currency without full object retrieval
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response(
+                {'success': False, 'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user is updating their own currency or is admin
+        if user != request.user and not request.user.is_staff:
+            return Response(
+                {'success': False, 'error': 'You can only update your own currency preference'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        currency = request.data.get('currency')
+        if not currency:
+            return Response(
+                {'success': False, 'error': 'Currency code is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate currency code (3 letters)
+        if not isinstance(currency, str) or len(currency) != 3:
+            return Response(
+                {'success': False, 'error': 'Invalid currency code. Must be 3 letters (e.g., USD, EUR, NGN)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update user's preferred currency
+        user.preferred_currency = currency.upper()
+        user.save()
+        
+        return Response({
+            'success': True,
+            'currency': user.preferred_currency,
+            'message': f'Currency preference updated to {user.preferred_currency}'
+        })
 
     @action(detail=True, methods=['get'])
     @permission_classes([permissions.IsAdminUser])
@@ -1533,18 +1586,23 @@ class PurchaseViewSet(viewsets.ModelViewSet):
             # Get auth token from request headers if available
             auth_token = request.META.get('HTTP_AUTHORIZATION', '').replace('Bearer ', '') if request.META.get('HTTP_AUTHORIZATION') else None
             
+            # Get user's preferred currency (default to NGN if not set)
+            user_currency = getattr(purchase.user, 'preferred_currency', 'NGN') or 'NGN'
+            
             # Generate Paystack payment URL
             payment_url = PaystackService.initiate_payment(
                 email=purchase.user.email,
                 amount=purchase.amount,
                 reference=purchase.paystack_reference or PaystackService.generate_reference("PURCHASE"),
+                user_currency=user_currency,
                 metadata={
                     'purchase_id': purchase.id,
                     'user_id': purchase.user.id,
                     'package_id': purchase.package.id,
                     'auth_token': auth_token,
                     'user_email': purchase.user.email,
-                    'user_name': purchase.user.get_full_name()
+                    'user_name': purchase.user.get_full_name(),
+                    'user_currency': user_currency
                 }
             )
             
@@ -1715,6 +1773,78 @@ class PurchaseViewSet(viewsets.ModelViewSet):
             'purchase': PurchaseSerializer(purchase).data,
             'message': 'Payment reconciled successfully'
         })
+
+
+class CurrencyView(APIView):
+    """API endpoint for currency-related operations"""
+    permission_classes = []  # Allow public access
+    
+    def get(self, request):
+        """Get supported currencies and current exchange rates"""
+        try:
+            # Get all supported currencies
+            supported_currencies = CurrencyService.get_supported_currencies()
+            
+            # Get base currency (USD)
+            base_currency = 'USD'
+            
+            # Get current exchange rates for all supported currencies
+            currencies_with_rates = []
+            for currency in supported_currencies:
+                currency_code = currency['code']
+                if currency_code == base_currency:
+                    rate = 1.0
+                else:
+                    rate = CurrencyService.get_exchange_rate(base_currency, currency_code)
+                
+                currencies_with_rates.append({
+                    **currency,
+                    'rate': rate,
+                    'paystack_supported': CurrencyService.is_paystack_supported(currency_code),
+                    'is_user_supported': CurrencyService.is_paystack_supported(currency_code)  # For compatibility
+                })
+            
+            return Response({
+                'success': True,
+                'baseCurrency': base_currency,
+                'currencies': currencies_with_rates
+            })
+        except Exception as e:
+            return Response(
+                {'success': False, 'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def post(self, request):
+        """Convert amount between currencies"""
+        try:
+            amount = request.data.get('amount')
+            from_currency = request.data.get('from_currency', 'USD')
+            to_currency = request.data.get('to_currency', 'USD')
+            
+            if not amount:
+                return Response(
+                    {'success': False, 'error': 'Amount is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            converted_amount = CurrencyService.convert_amount(float(amount), from_currency, to_currency)
+            exchange_rate = CurrencyService.get_exchange_rate(from_currency, to_currency)
+            
+            return Response({
+                'success': True,
+                'originalAmount': float(amount),
+                'originalCurrency': from_currency,
+                'convertedAmount': converted_amount,
+                'targetCurrency': to_currency,
+                'exchangeRate': exchange_rate,
+                'symbol': CurrencyService.get_currency_symbol(to_currency)
+            })
+        except Exception as e:
+            return Response(
+                {'success': False, 'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def generate_invoice(self, request, pk=None):

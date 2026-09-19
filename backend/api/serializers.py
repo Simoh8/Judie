@@ -10,10 +10,11 @@ class UserSerializer(serializers.ModelSerializer):
     sessionsJoined = serializers.IntegerField(source='sessions_joined', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     isStaff = serializers.BooleanField(source='is_staff', required=False)
+    preferredCurrency = serializers.CharField(source='preferred_currency', required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'firstName', 'lastName', 'focusHours', 'sessionsJoined', 'createdAt', 'isStaff']
+        fields = ['id', 'email', 'username', 'firstName', 'lastName', 'focusHours', 'sessionsJoined', 'createdAt', 'isStaff', 'preferredCurrency']
         read_only_fields = ['id', 'email', 'username', 'focusHours', 'sessionsJoined', 'createdAt']
 
 

@@ -7,6 +7,7 @@ from .views import (
     ForgotPasswordView, ResetPasswordView, VerifyResetTokenView,
     PackageViewSet, PurchaseViewSet, SystemSettingsViewSet, EnvironmentVariablesView,
     PaymentMethodViewSet,
+    CurrencyView,
 )
 
 router = DefaultRouter()
@@ -33,5 +34,7 @@ urlpatterns = [
     path('payments/webhook/', PurchaseViewSet.as_view({'post': 'webhook'}), name='paystack_webhook'),
     # Environment variables management
     path('environment-variables/', EnvironmentVariablesView.as_view(), name='environment_variables'),
+    # Currency operations
+    path('currency/', CurrencyView.as_view(), name='currency'),
     path('', include(router.urls)),
 ]

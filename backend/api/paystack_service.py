@@ -18,29 +18,55 @@ class PaystackService:
         if not secret_key:
             raise ValueError("PAYSTACK_SECRET_KEY not configured")
         
+        print(f"Using Paystack Secret Key: {secret_key[:10]}...{secret_key[-4:]}")
+        
         return {
             "Authorization": f"Bearer {secret_key}",
             "Content-Type": "application/json"
         }
     
     @classmethod
-    def initiate_payment(cls, email, amount, reference, metadata=None):
+    def initiate_payment(cls, email, amount, reference, metadata=None, user_currency='NGN'):
         """
         Initiate a payment transaction with Paystack
         
         Args:
             email: Customer email address
-            amount: Amount in Naira (Paystack uses Naira by default)
+            amount: Amount in USD (base currency)
             reference: Unique transaction reference
             metadata: Additional metadata dict
+            user_currency: User's preferred currency (default: NGN)
             
         Returns:
             dict with payment details including authorization_url
         """
         try:
-            # Convert USD to Naira (approximate rate - in production use real API)
-            # For now, we'll assume 1 USD = 1500 Naira
-            amount_in_naira = int(float(amount) * 1500 * 100)  # Paystack expects amount in kobo
+            # Import CurrencyService here to avoid circular imports
+            from .currency_service import CurrencyService
+            
+            # Determine the best Paystack-supported currency for the user
+            paystack_currency = CurrencyService.get_best_paystack_currency(user_currency)
+            
+            # Convert USD to user's preferred currency
+            amount_in_user_currency = CurrencyService.convert_amount(float(amount), 'USD', user_currency)
+            
+            # If user's currency is not supported by Paystack, convert to the supported currency
+            if paystack_currency != user_currency:
+                amount_in_paystack_currency = CurrencyService.convert_amount(amount_in_user_currency, user_currency, paystack_currency)
+                print(f"Currency conversion: ${amount} USD -> {amount_in_user_currency:.2f} {user_currency} -> {amount_in_paystack_currency:.2f} {paystack_currency}")
+            else:
+                amount_in_paystack_currency = amount_in_user_currency
+                print(f"Currency conversion: ${amount} USD -> {amount_in_paystack_currency:.2f} {paystack_currency}")
+            
+            # Convert to smallest currency unit (kobo for NGN, cents for USD, etc.)
+            if paystack_currency == 'NGN':
+                amount_in_smallest_unit = int(amount_in_paystack_currency * 100)  # kobo
+            elif paystack_currency in ['USD', 'EUR', 'GBP', 'GHS', 'ZAR']:
+                amount_in_smallest_unit = int(amount_in_paystack_currency * 100)  # cents
+            else:
+                amount_in_smallest_unit = int(amount_in_paystack_currency * 100)  # default to cents
+            
+            print(f"Paystack Payment: {amount_in_smallest_unit} {paystack_currency} (smallest unit) for ${amount} USD")
             
             url = f"{cls.BASE_URL}/transaction/initialize"
             headers = cls.get_headers()
@@ -52,16 +78,37 @@ class PaystackService:
             
             payload = {
                 "email": email,
-                "amount": amount_in_naira,
+                "amount": amount_in_smallest_unit,
                 "reference": reference,
                 "callback_url": callback_url,
+                "currency": paystack_currency,  # Use dynamic currency based on user preference
                 "metadata": metadata or {}
             }
+            
+            print(f"Paystack Request Payload: {payload}")
             
             response = requests.post(url, json=payload, headers=headers, timeout=30)
             response_data = response.json()
             
+            # # Log response for debugging
+            # print(f"Paystack API Response: Status {response.status_code}")
+            # print(f"Paystack API Response Data: {response_data}")
+            
+            # Log specific error details
+            if response.status_code != 200:
+                # print(f"Paystack Error Details:")
+                # print(f"  Message: {response_data.get('message', 'Unknown error')}")
+                # print(f"  Type: {response_data.get('type', 'Unknown')}")
+                # print(f"  Code: {response_data.get('code', 'Unknown')}")
+                if 'meta' in response_data:
+                    print(f"  Meta: {response_data['meta']}")
+            
             if response.status_code == 200 and response_data.get('status'):
+                # Verify the currency in response
+                response_currency = response_data['data'].get('currency', 'NGN')
+                if response_currency != 'NGN':
+                    print(f"WARNING: Paystack returned currency {response_currency} instead of NGN")
+                
                 return {
                     'authorization_url': response_data['data']['authorization_url'],
                     'reference': response_data['data']['reference'],
@@ -182,7 +229,7 @@ class PaystackService:
                             user_name = purchase.user.first_name if purchase.user.first_name else purchase.user.email.split('@')[0]
                             
                             # Get frontend URL for invoice download
-                            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                            frontend_url = getattr(settings, 'FRONTEND_URL')
                             invoice_download_link = f"{frontend_url}/billing"
                             
                             EmailService.send_payment_confirmation_email(

@@ -36,6 +36,7 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     password_reset_token = models.CharField(max_length=255, blank=True, null=True)
     password_reset_token_expires = models.DateTimeField(blank=True, null=True)
+    preferred_currency = models.CharField(max_length=3, default='USD', help_text="User's preferred currency for payments")
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []

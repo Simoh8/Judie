@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Check, Crown, Zap, Building2, ArrowRight, CreditCard, Loader2, AlertCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import CurrencySelector from "@/components/CurrencySelector";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthModal from "@/components/AuthModal";
 
@@ -23,6 +24,14 @@ interface Package {
   sortOrder: number;
 }
 
+interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+  rate: number;
+  paystack_supported: boolean;
+}
+
 export default function PricingPage() {
   const { user } = useAuth();
   const [packages, setPackages] = useState<Package[]>([]);
@@ -30,10 +39,52 @@ export default function PricingPage() {
   const [processingPurchase, setProcessingPurchase] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [pendingPackageId, setPendingPackageId] = useState<string | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("USD");
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [currencySymbol, setCurrencySymbol] = useState<string>("$");
 
   useEffect(() => {
     loadPackages();
+    loadCurrencyData();
   }, []);
+
+  const loadCurrencyData = async () => {
+    try {
+      // Get user's preferred currency
+      const userStr = localStorage.getItem('user');
+      let userCurrency = 'USD';
+      
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          userCurrency = user.preferredCurrency || 'USD';
+        } catch (error) {
+          console.error("Failed to parse user data:", error);
+        }
+      }
+      
+      // Load currency data
+      const response = await fetch('/api/currency');
+      const data = await response.json();
+      
+      if (data.success && data.currencies) {
+        const currencyData = data.currencies.find((c: Currency) => c.code === userCurrency);
+        if (currencyData) {
+          setSelectedCurrency(userCurrency);
+          setExchangeRate(currencyData.rate);
+          setCurrencySymbol(currencyData.symbol);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load currency data:", error);
+    }
+  };
+
+  const handleCurrencyChange = (currencyCode: string) => {
+    setSelectedCurrency(currencyCode);
+    // Reload currency data when changed
+    loadCurrencyData();
+  };
 
   const loadPackages = async () => {
     try {
@@ -138,6 +189,27 @@ export default function PricingPage() {
     return duration.charAt(0).toUpperCase() + duration.slice(1);
   };
 
+  const convertPrice = (priceUSD: number): number => {
+    if (selectedCurrency === 'USD') {
+      return priceUSD;
+    }
+    return priceUSD * exchangeRate;
+  };
+
+  const formatPrice = (priceUSD: number): string => {
+    try {
+      const convertedPrice = convertPrice(priceUSD);
+      const safePrice = Number(convertedPrice);
+      if (isNaN(safePrice) || !isFinite(safePrice)) {
+        return `${currencySymbol}${priceUSD.toFixed(2)}`;
+      }
+      return `${currencySymbol}${safePrice.toFixed(2)}`;
+    } catch (error) {
+      console.error('Price formatting error:', error);
+      return `${currencySymbol}${priceUSD.toFixed(2)}`;
+    }
+  };
+
   const getCtaText = (pkg: Package) => {
     if (!user) return "Sign Up to Purchase";
     if (pkg.price === 0) return "Get Started Free";
@@ -165,11 +237,14 @@ export default function PricingPage() {
 
           {/* Hero Section */}
           <div className="text-center mb-16">
-            <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
-              Simple, Transparent Pricing
-            </h1>
+            <div className="flex items-center justify-center gap-4 mb-6">
+              <h1 className="text-5xl md:text-6xl font-bold text-foreground">
+                Simple, Transparent Pricing
+              </h1>
+              <CurrencySelector onCurrencyChange={handleCurrencyChange} />
+            </div>
             <p className="text-xl text-foreground/60 max-w-2xl mx-auto">
-              Choose the plan that fits your focus goals. All prices in USD.
+              Choose the plan that fits your focus goals. Prices displayed in {selectedCurrency}.
             </p>
           </div>
 
@@ -207,11 +282,16 @@ export default function PricingPage() {
                     <p className="text-foreground/60 mb-6">{pkg.description}</p>
                     <div className="mb-6">
                       <span className="text-4xl font-bold text-foreground">
-                        ${pkg.price}
+                        {formatPrice(pkg.price)}
                       </span>
                       <span className="text-foreground/60">
                         /{formatDuration(pkg.duration)}
                       </span>
+                      {selectedCurrency !== 'USD' && (
+                        <div className="text-xs text-foreground/60 mt-1">
+                          ${pkg.price} USD
+                        </div>
+                      )}
                     </div>
                     
                     <ul className="space-y-3 mb-8">
