@@ -101,8 +101,8 @@ export default function BillingPage() {
         setActivePackage(null);
       }
 
-      // Load invoices/purchases
-      const invoicesResponse = await fetch(`/api/purchases?user=${user.id}`, {
+      // Load invoices/purchases (only completed ones)
+      const invoicesResponse = await fetch(`/api/purchases?user=${user.id}&status=completed`, {
         headers
       });
       const invoicesData = await invoicesResponse.json();
