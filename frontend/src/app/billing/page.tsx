@@ -56,7 +56,6 @@ interface Invoice {
   status: string;
   payment_date: string | null;
   package_name: string;
-  receipt_url: string | null;
   created_at: string;
 }
 
@@ -115,7 +114,6 @@ export default function BillingPage() {
           status: purchase.status,
           payment_date: purchase.paymentDate,
           package_name: purchase.package.name,
-          receipt_url: purchase.receiptUrl,
           created_at: purchase.createdAt
         }));
         setInvoices(formattedInvoices);
@@ -158,36 +156,48 @@ export default function BillingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const handleDownloadInvoice = useCallback(async (invoice: Invoice) => {
-    try {
-      if (invoice.receipt_url) {
-        window.open(invoice.receipt_url, '_blank');
-      } else {
-        // Generate invoice if not available
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+const handleDownloadInvoice = useCallback(async (invoice: Invoice) => {
+  try {
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-        const response = await fetch(`/api/purchases/${invoice.id}/generate_invoice`, {
-          method: 'POST',
-          headers,
-        });
-        const data = await response.json();
-        if (data.success && data.invoice_url) {
-          window.open(data.invoice_url, '_blank');
-          setToast({ type: "success", message: "Invoice generated successfully" });
-        } else {
-          setToast({ type: "error", message: "Failed to generate invoice" });
-        }
+    const backendUrl =
+      process.env.NEXT__BACKEND_URL || "http://127.0.0.1:8000";
+
+    const response = await fetch(
+      `${backendUrl}/api/purchases/${invoice.id}/download_invoice/`,
+      { headers }
+    );
+
+    if (!response.ok) {
+      let message = `Failed to download invoice (${response.status})`;
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const errorData = await response.json().catch(() => null);
+        if (errorData?.error) message = errorData.error;
       }
-    } catch (error) {
-      console.error("Failed to download invoice:", error);
-      setToast({ type: "error", message: "Failed to download invoice" });
+      throw new Error(message);
     }
-  }, [token]);
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `invoice_${invoice.invoice_number}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    setToast({ type: "success", message: "Invoice downloaded successfully" });
+  } catch (error) {
+    console.error("Failed to download invoice:", error);
+    setToast({
+      type: "error",
+      message: error instanceof Error ? error.message : "Failed to download invoice",
+    });
+  }
+}, [token]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

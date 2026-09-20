@@ -6,7 +6,7 @@ from .views import (
     SessionViewSet, UserViewSet, ReviewViewSet, LeadRequestViewSet,
     ForgotPasswordView, ResetPasswordView, VerifyResetTokenView,
     PackageViewSet, PurchaseViewSet, SystemSettingsViewSet, EnvironmentVariablesView,
-    PaymentMethodViewSet,
+    PaymentMethodViewSet, InvoiceDownloadView,
     CurrencyView,
 )
 
@@ -32,6 +32,8 @@ urlpatterns = [
     path('auth/google/callback/', GoogleOAuthCallbackView.as_view(), name='google_oauth_callback'),
     # Paystack webhook endpoint
     path('payments/webhook/', PurchaseViewSet.as_view({'post': 'webhook'}), name='paystack_webhook'),
+    # Invoice download endpoint
+    path('purchases/<int:pk>/download_invoice/', InvoiceDownloadView.as_view(), name='purchase_download_invoice'),
     # Environment variables management
     path('environment-variables/', EnvironmentVariablesView.as_view(), name='environment_variables'),
     # Currency operations

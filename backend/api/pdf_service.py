@@ -15,42 +15,23 @@ class PDFInvoiceService:
     """Service for generating PDF invoices"""
     
     @staticmethod
-    def generate_invoice_pdf(purchase, output_path=None):
+    def _build_invoice_elements(purchase):
         """
-        Generate a PDF invoice for a purchase
+        Build the PDF elements for an invoice
         
         Args:
             purchase: Purchase model instance
-            output_path: Optional path to save the PDF file
             
         Returns:
-            str: Path to the generated PDF file
+            list: List of PDF elements
         """
         try:
             from reportlab.lib.pagesizes import letter, A4
             from reportlab.lib import colors
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.lib.units import inch
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+            from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
             from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-            import io
-            
-            # Create output directory if it doesn't exist
-            if output_path is None:
-                invoices_dir = Path(settings.MEDIA_ROOT) / 'invoices'
-                invoices_dir.mkdir(parents=True, exist_ok=True)
-                invoice_filename = f"invoice_{purchase.id}_{purchase.invoice_number or 'temp'}.pdf"
-                output_path = str(invoices_dir / invoice_filename)
-            
-            # Create PDF document
-            doc = SimpleDocTemplate(
-                output_path,
-                pagesize=A4,
-                rightMargin=72,
-                leftMargin=72,
-                topMargin=72,
-                bottomMargin=18
-            )
             
             # Get styles
             styles = getSampleStyleSheet()
@@ -237,6 +218,48 @@ class PDFInvoiceService:
             )
             elements.append(footer_text)
             
+            return elements
+            
+        except Exception as e:
+            print(f"Error building invoice elements: {e}")
+            return []
+    
+    @staticmethod
+    def generate_invoice_pdf(purchase, output_path=None):
+        """
+        Generate a PDF invoice for a purchase
+        
+        Args:
+            purchase: Purchase model instance
+            output_path: Optional path to save the PDF file
+            
+        Returns:
+            str: Path to the generated PDF file
+        """
+        try:
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate
+            
+            # Create output directory if it doesn't exist
+            if output_path is None:
+                invoices_dir = Path(settings.MEDIA_ROOT) / 'invoices'
+                invoices_dir.mkdir(parents=True, exist_ok=True)
+                invoice_filename = f"invoice_{purchase.id}_{purchase.invoice_number or 'temp'}.pdf"
+                output_path = str(invoices_dir / invoice_filename)
+            
+            # Create PDF document
+            doc = SimpleDocTemplate(
+                output_path,
+                pagesize=A4,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=18
+            )
+            
+            # Build PDF content
+            elements = PDFInvoiceService._build_invoice_elements(purchase)
+            
             # Build PDF
             doc.build(elements)
             
@@ -251,33 +274,90 @@ class PDFInvoiceService:
             return None
     
     @staticmethod
-    def get_invoice_url(purchase):
+    def generate_invoice_pdf_bytes(purchase):
         """
-        Get the URL for an invoice PDF
+        Generate a PDF invoice for a purchase and return as bytes
         
         Args:
             purchase: Purchase model instance
             
         Returns:
-            str: URL to access the invoice PDF
+            bytes: PDF file content
+        """
+        try:
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate
+            import io
+            
+            print(f"Starting PDF generation for purchase {purchase.id}")
+            
+            # Create in-memory PDF
+            buffer = io.BytesIO()
+            
+            # Create PDF document
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=18
+            )
+            
+            # Build PDF content
+            elements = PDFInvoiceService._build_invoice_elements(purchase)
+            
+            if not elements:
+                print("No elements generated for PDF")
+                return None
+            
+            # Build PDF
+            doc.build(elements)
+            
+            # Get PDF bytes
+            pdf_bytes = buffer.getvalue()
+            buffer.close()
+            
+            print(f"PDF generated successfully, size: {len(pdf_bytes)} bytes")
+            return pdf_bytes
+            
+        except ImportError:
+            # If reportlab is not installed, return None
+            print("Warning: reportlab not installed. Install it with: pip install reportlab")
+            return None
+        except Exception as e:
+            import traceback
+            print(f"Error generating PDF invoice bytes: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return None
+    
+    @staticmethod
+    def get_invoice_url(purchase):
+        """
+        Get the URL for an invoice PDF (secure API endpoint)
+        
+        Args:
+            purchase: Purchase model instance
+            
+        Returns:
+            str: URL to access the invoice PDF via secure API
         """
         if not purchase.invoice_number:
             return None
         
-        invoice_filename = f"invoice_{purchase.id}_{purchase.invoice_number}.pdf"
-        media_url = getattr(settings, 'MEDIA_URL', '/media/')
-        return f"{media_url}invoices/{invoice_filename}"
+        # Return secure API endpoint URL instead of direct media path
+        return f"/api/purchases/{purchase.id}/download_invoice/"
     
     @staticmethod
     def generate_and_save_invoice(purchase):
         """
-        Generate and save invoice PDF for a purchase
+        Generate invoice number for a purchase (PDF is generated on-demand)
         
         Args:
             purchase: Purchase model instance
             
         Returns:
-            str: URL to the generated invoice PDF, or None if generation failed
+            str: URL to the invoice download endpoint, or None if generation failed
         """
         if not purchase.invoice_number:
             # Generate invoice number if it doesn't exist
@@ -288,16 +368,8 @@ class PDFInvoiceService:
             purchase.invoice_number = f"{invoice_prefix}-{timestamp}-{unique_id}"
             purchase.save()
         
-        # Generate PDF
-        pdf_path = PDFInvoiceService.generate_invoice_pdf(purchase)
+        # Update purchase with secure receipt URL
+        purchase.receipt_url = PDFInvoiceService.get_invoice_url(purchase)
+        purchase.save()
         
-        if pdf_path:
-            # Update purchase with receipt URL
-            media_url = getattr(settings, 'MEDIA_URL', '/media/')
-            invoice_filename = f"invoice_{purchase.id}_{purchase.invoice_number}.pdf"
-            purchase.receipt_url = f"{media_url}invoices/{invoice_filename}"
-            purchase.save()
-            
-            return purchase.receipt_url
-        
-        return None
+        return purchase.receipt_url

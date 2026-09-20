@@ -108,6 +108,7 @@ class PaystackService:
                 response_currency = response_data['data'].get('currency', 'NGN')
                 if response_currency != 'NGN':
                     print(f"WARNING: Paystack returned currency {response_currency} instead of NGN")
+                    return None
                 
                 return {
                     'authorization_url': response_data['data']['authorization_url'],

@@ -15,6 +15,12 @@ from django.utils.decorators import method_decorator
 import os
 import re
 import jwt
+import logging
+import uuid
+from django.http import HttpResponse
+from django.utils import timezone
+
+
 import requests as http_requests
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -28,6 +34,7 @@ from .subscription_service import SubscriptionService
 from .currency_service import CurrencyService
 import json
 
+logger = logging.getLogger(__name__)
 
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
@@ -2005,6 +2012,82 @@ class CurrencyView(APIView):
             'success': True,
             'purchase': PurchaseSerializer(purchase).data
         })
+
+
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class InvoiceDownloadView(APIView):
+    """Dedicated view for invoice PDF download"""
+    
+    def get(self, request, pk):
+        """Download invoice PDF for a specific purchase"""
+        try:
+            print(f"InvoiceDownloadView called for pk={pk}, user={request.user if request.user.is_authenticated else 'anonymous'}")
+            
+            if not request.user.is_authenticated:
+                return Response(
+                    {'success': False, 'error': 'Authentication required'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            purchase = Purchase.objects.get(pk=pk)
+            print(f"Purchase found: {purchase.id}, user={purchase.user.email}")
+            
+            # Check if the purchase belongs to the current user or if user is admin
+            if purchase.user != request.user and not request.user.is_staff:
+                return Response(
+                    {'success': False, 'error': 'You can only download invoices for your own purchases'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Generate invoice number if it doesn't exist
+            if not purchase.invoice_number:
+                import uuid
+                invoice_prefix = "INV"
+                timestamp = timezone.now().strftime('%Y%m%d')
+                unique_id = str(uuid.uuid4())[:8].upper()
+                purchase.invoice_number = f"{invoice_prefix}-{timestamp}-{unique_id}"
+                purchase.save()
+            
+            # Generate PDF on-the-fly
+            from .pdf_service import PDFInvoiceService
+            
+            # Generate PDF in memory
+            pdf_bytes = PDFInvoiceService.generate_invoice_pdf_bytes(purchase)
+            
+            if not pdf_bytes:
+                return Response(
+                    {'success': False, 'error': 'Failed to generate invoice - PDF generation returned None'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Create HTTP response with PDF
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            invoice_filename = f"invoice_{purchase.id}_{purchase.invoice_number}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{invoice_filename}"'
+            response['Content-Length'] = len(pdf_bytes)
+            
+            return response
+            
+        except Purchase.DoesNotExist:
+            return Response(
+                {'success': False, 'error': 'Purchase not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ImportError as e:
+            return Response(
+                {'success': False, 'error': f'ReportLab not installed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"PDF Generation Error: {error_details}")
+            return Response(
+                {'success': False, 'error': f'Failed to generate invoice: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class PaymentMethodViewSet(viewsets.ModelViewSet):
