@@ -30,8 +30,8 @@ class SessionSerializer(serializers.ModelSerializer):
     zoomStartUrl = serializers.URLField(source='zoom_start_url', read_only=True)
     zoomPassword = serializers.CharField(source='zoom_password', read_only=True)
     isBooked = serializers.SerializerMethodField()
-    isOngoing = serializers.BooleanField(source='is_ongoing')
-    regenerateIntervalHours = serializers.IntegerField(source='regenerate_interval_hours')
+    isOngoing = serializers.BooleanField(source='is_ongoing', required=False)
+    regenerateIntervalHours = serializers.IntegerField(source='regenerate_interval_hours', required=False)
     lastRegeneratedAt = serializers.DateTimeField(source='last_regenerated_at', read_only=True)
 
     class Meta:
@@ -61,6 +61,9 @@ class SessionSerializer(serializers.ModelSerializer):
             # Set scheduled_for to now if not provided
             if not attrs.get('scheduled_for'):
                 attrs['scheduled_for'] = timezone.now()
+            # Require regenerate_interval_hours for ongoing sessions
+            if not attrs.get('regenerate_interval_hours'):
+                raise serializers.ValidationError({'regenerateIntervalHours': 'This field is required for ongoing sessions'})
         else:
             # For non-ongoing sessions, validate that scheduled_for is not in the past
             scheduled_for = attrs.get('scheduled_for')
