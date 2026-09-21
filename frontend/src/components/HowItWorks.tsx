@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Video, CheckCircle } from "lucide-react";
+import { Calendar, Video, CheckCircle, ArrowRight } from "lucide-react";
 
 const steps = [
   {
@@ -60,9 +60,7 @@ export default function HowItWorks() {
               
               {index < steps.length - 1 && (
                 <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 text-ios-blue/30">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
+                  <ArrowRight size={24} />
                 </div>
               )}
             </div>
