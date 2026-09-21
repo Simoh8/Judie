@@ -52,3 +52,27 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/sessions/${params.id}/`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete session error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
